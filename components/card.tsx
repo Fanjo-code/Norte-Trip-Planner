@@ -23,7 +23,8 @@ export function Card({ elevated = false, style, children, ...rest }: CardProps) 
         elevated ? CardShadow : undefined,
         style,
       ]}
-      {...rest}>
+      {...rest}
+    >
       {children}
     </View>
   );

@@ -1,42 +1,48 @@
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 const DAY_MS = 86_400_000;
-
-/** 1240 → "1.240" (European thousands separator, no Intl dependency). */
-export function groupThousands(value: number): string {
-  const sign = value < 0 ? '-' : '';
-  const digits = Math.round(Math.abs(value)).toString();
-  return sign + digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+export function groupThousands(value: number) {
+  return Math.round(value).toLocaleString('en-GB');
 }
-
-export function formatPrice(value: number, currency: 'EUR' = 'EUR'): string {
-  const symbol = currency === 'EUR' ? '€' : '$';
-  return `${symbol}${groupThousands(value)}`;
+export function formatPrice(value: number | null | undefined, currency: 'EUR' = 'EUR') {
+  return value == null
+    ? 'Price varies'
+    : new Intl.NumberFormat('en-GB', {
+        style: 'currency',
+        currency,
+        maximumFractionDigits: 0,
+      }).format(value);
 }
-
-/** Date → "Aug 12". */
-export function formatDate(date: Date): string {
-  return `${MONTHS[date.getMonth()]} ${date.getDate()}`;
+export function localISO(date: Date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
 }
-
-/** Date range → "Aug 12 – Aug 16". */
-export function formatDateRange(start: Date, end: Date): string {
-  return `${formatDate(start)} – ${formatDate(end)}`;
+export function parseDate(value: string) {
+  const [y, m, d] = value.slice(0, 10).split('-').map(Number);
+  return new Date(y, m - 1, d, 12);
 }
-
-/** Inclusive number of days in the range (min 1). */
-export function daysBetween(start: Date, end: Date): number {
-  const days = Math.round((end.getTime() - start.getTime()) / DAY_MS) + 1;
-  return Math.max(1, days);
+export function formatDate(date: Date) {
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
-
-/** Number of nights (days − 1, min 0). */
-export function nightsBetween(start: Date, end: Date): number {
-  return Math.max(0, daysBetween(start, end) - 1);
+export function formatDateRange(start: Date, end: Date) {
+  return `${formatDate(start)} – ${formatDate(end)}, ${end.getFullYear()}`;
 }
-
-export function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
+export function daysBetween(start: Date, end: Date) {
+  return Math.max(
+    1,
+    Math.round(
+      (Date.UTC(end.getFullYear(), end.getMonth(), end.getDate()) -
+        Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())) /
+        DAY_MS,
+    ) + 1,
+  );
+}
+export function nightsBetween(start: Date, end: Date) {
+  return daysBetween(start, end) - 1;
+}
+export function addDays(date: Date, days: number) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
 }

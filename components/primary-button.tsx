@@ -12,7 +12,14 @@ interface PrimaryButtonProps extends Omit<PressableProps, 'style'> {
   style?: ViewStyle;
 }
 
-export function PrimaryButton({ label, icon, style, disabled, onPress, ...rest }: PrimaryButtonProps) {
+export function PrimaryButton({
+  label,
+  icon,
+  style,
+  disabled,
+  onPress,
+  ...rest
+}: PrimaryButtonProps) {
   const t = useTheme();
 
   return (
@@ -25,8 +32,8 @@ export function PrimaryButton({ label, icon, style, disabled, onPress, ...rest }
         { backgroundColor: t.accent, opacity: disabled ? 0.45 : pressed ? 0.85 : 1 },
         style,
       ]}
-      {...rest}>
-
+      {...rest}
+    >
       <Text style={styles.label}>{label}</Text>
       {icon ? <Ionicons name={icon} size={18} color="#FFFFFF" /> : null}
     </Pressable>

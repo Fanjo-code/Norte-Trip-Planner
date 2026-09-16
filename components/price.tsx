@@ -22,7 +22,13 @@ interface PriceProps {
   style?: StyleProp<TextStyle>;
 }
 
-export function Price({ value, currency = 'EUR', size = 'body', muted = false, style }: PriceProps) {
+export function Price({
+  value,
+  currency = 'EUR',
+  size = 'body',
+  muted = false,
+  style,
+}: PriceProps) {
   const t = useTheme();
 
   return (
@@ -30,7 +36,8 @@ export function Price({ value, currency = 'EUR', size = 'body', muted = false, s
       style={[
         { fontSize: SIZES[size], color: muted ? t.textSecondary : t.text, fontWeight: '700' },
         style,
-      ]}>
+      ]}
+    >
       {formatPrice(value, currency)}
     </Text>
   );

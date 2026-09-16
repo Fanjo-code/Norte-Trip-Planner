@@ -1,57 +1,54 @@
-import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
+import { ScrollView, View, useWindowDimensions, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-
-interface ScreenProps {
+import type { ReactNode } from 'react';
+import { useTheme } from '@/hooks/use-theme';
+export function Screen({
+  children,
+  scroll = true,
+  style,
+  contentStyle,
+}: {
   children: ReactNode;
   scroll?: boolean;
   style?: ViewStyle;
   contentStyle?: ViewStyle;
-}
-
-/**
- * Standard screen wrapper: iOS-safe top inset, optional scroll, centered
- * max-width so the layout also looks right on web.
- */
-export function Screen({ children, scroll = true, style, contentStyle }: ScreenProps) {
+}) {
+  const t = useTheme();
   const insets = useSafeAreaInsets();
-
+  const { width } = useWindowDimensions();
   const content = (
-    <View style={[styles.content, { paddingTop: insets.top + Spacing.lg }, contentStyle]}>
+    <View
+      style={[
+        {
+          width: '100%',
+          maxWidth: 1240,
+          alignSelf: 'center',
+          paddingHorizontal: width > 900 ? 44 : 20,
+          paddingTop: 28,
+          paddingBottom: 48 + insets.bottom,
+          gap: 24,
+        },
+        contentStyle,
+      ]}
+    >
       {children}
     </View>
   );
-
   return (
-    <ThemedView style={[styles.root, style]}>
+    <View style={[{ flex: 1, backgroundColor: t.background }, style]}>
       {scroll ? (
         <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled">
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets
+        >
           {content}
         </ScrollView>
       ) : (
         content
       )}
-    </ThemedView>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  scroll: { flex: 1 },
-  scrollContent: { flexGrow: 1 },
-  content: {
-    flex: 1,
-    width: '100%',
-    maxWidth: 720,
-    alignSelf: 'center',
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.huge + Spacing.xl,
-  },
-});

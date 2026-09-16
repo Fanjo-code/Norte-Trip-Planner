@@ -46,7 +46,7 @@ export function TimelineItem({
             <View style={[styles.cardText, checked && { opacity: 0.55 }]}>
               <View style={styles.topRow}>
                 <Text style={[styles.title, { color: t.text }]}>{activity.title}</Text>
-                {activity.price > 0 ? (
+                {activity.price != null && activity.price > 0 ? (
                   <Text style={[styles.price, { color: t.textSecondary }]}>
                     {formatPrice(activity.price)}
                   </Text>
@@ -56,15 +56,9 @@ export function TimelineItem({
                 <Ionicons name="location" size={11} color={t.icon} /> {activity.place}
               </Text>
             </View>
-            {onToggle ? (
-              <CheckButton checked={checked} onToggle={onToggle} />
-            ) : null}
+            {onToggle ? <CheckButton checked={checked} onToggle={onToggle} /> : null}
           </View>
-          <Text
-            style={[
-              styles.desc,
-              { color: t.textSecondary, opacity: checked ? 0.55 : 1 },
-            ]}>
+          <Text style={[styles.desc, { color: t.textSecondary, opacity: checked ? 0.55 : 1 }]}>
             {activity.description}
           </Text>
         </View>

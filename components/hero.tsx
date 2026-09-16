@@ -1,148 +1,51 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { FontSize, Radius, Spacing } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
 import type { IoniconName } from '@/types/trip';
-
-interface HeroProps {
-  title: string;
-  subtitle?: string;
-  footer?: string;
-  icon?: IoniconName;
-  /** Unsplash photo URL — shows a photo hero with gradient overlay. Falls back to gradient. */
-  imageUrl?: string | null;
-}
-
-/**
- * Destination hero — shows a photo when available, gradient fallback otherwise.
- * This keeps the app feeling alive without requiring offline images.
- */
 export function Hero({
   title,
   subtitle,
   footer,
-  icon = 'compass',
   imageUrl,
-}: HeroProps) {
-  const scheme = useColorScheme();
-
-  // Photo mode: image + dark gradient overlay for text readability.
-  if (imageUrl) {
-    return (
-      <View style={styles.photoWrap}>
+}: {
+  title: string;
+  subtitle?: string;
+  footer?: string;
+  icon?: IoniconName;
+  imageUrl?: string | null;
+}) {
+  return (
+    <View style={{ height: 330, borderRadius: 18, overflow: 'hidden', backgroundColor: '#495740' }}>
+      {imageUrl && (
         <Image
           source={{ uri: imageUrl }}
           contentFit="cover"
-          transition={400}
-          style={styles.photo}
+          style={{ position: 'absolute', width: '100%', height: '100%' }}
         />
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.55)']}
-          style={styles.photoOverlay}>
-          <View style={styles.content}>
-            <Text style={styles.title}>{title}</Text>
-            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-            {footer ? <Text style={styles.footerText}>{footer}</Text> : null}
-          </View>
-        </LinearGradient>
-      </View>
-    );
-  }
-
-  // Gradient fallback for unknown destinations.
-  const colors: [string, string] =
-    scheme === 'dark' ? ['#123A33', '#0A241F'] : ['#0E7C66', '#0A5B4A'];
-
-  return (
-    <LinearGradient
-      colors={colors}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.gradient}>
-      <Ionicons
-        name={icon}
-        size={120}
-        color="rgba(255,255,255,0.10)"
-        style={styles.watermark}
-      />
-      <View style={styles.content}>
-        <Text style={styles.title}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-        {footer ? (
-          <View style={styles.footer}>
-            <Ionicons name="sparkles" size={12} color="rgba(255,255,255,0.9)" />
-            <Text style={styles.footerText}>{footer}</Text>
-          </View>
-        ) : null}
-      </View>
-    </LinearGradient>
+      )}
+      <LinearGradient
+        colors={['rgba(20,30,18,.06)', 'rgba(20,30,18,.72)']}
+        style={{ flex: 1, padding: 32, justifyContent: 'flex-end', gap: 12 }}
+      >
+        <Text
+          style={{ color: '#FFF', fontSize: 10, letterSpacing: 2.5, textTransform: 'uppercase' }}
+        >
+          {footer ?? 'A CITY TO CALL YOUR OWN'}
+        </Text>
+        <Text
+          style={{
+            fontFamily: Fonts.serif,
+            fontSize: 64,
+            lineHeight: 72,
+            letterSpacing: -2,
+            color: '#FFF',
+          }}
+        >
+          {title}
+        </Text>
+        <Text style={{ color: '#FFFFFFD9', fontSize: 13 }}>{subtitle}</Text>
+      </LinearGradient>
+    </View>
   );
 }
-
-const HERO_HEIGHT = 220;
-
-const styles = StyleSheet.create({
-  // Photo mode
-  photoWrap: {
-    height: HERO_HEIGHT,
-    borderRadius: Radius.xl,
-    overflow: 'hidden',
-  },
-  photo: {
-    width: '100%',
-    height: HERO_HEIGHT,
-  },
-  photoOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'flex-end',
-    padding: Spacing.xl,
-  },
-
-  // Gradient fallback mode
-  gradient: {
-    minHeight: HERO_HEIGHT,
-    borderRadius: Radius.xl,
-    padding: Spacing.xl,
-    justifyContent: 'flex-end',
-    overflow: 'hidden',
-  },
-  watermark: {
-    position: 'absolute',
-    top: -20,
-    right: -14,
-  },
-
-  // Shared text
-  content: {
-    gap: Spacing.xs,
-  },
-  title: {
-    color: '#FFFFFF',
-    fontSize: FontSize.huge,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: FontSize.small,
-    fontWeight: '500',
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    marginTop: Spacing.sm,
-  },
-  footerText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: FontSize.caption,
-    fontWeight: '600',
-  },
-});

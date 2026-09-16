@@ -1,288 +1,176 @@
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Image } from 'expo-image';
-
-import { Card } from '@/components/card';
-import { CheckButton } from '@/components/check-button';
-import { Badge } from '@/components/tags';
-import { Rating } from '@/components/rating';
+import { Linking, Pressable, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Screen } from '@/components/screen';
-import { ScreenHeader } from '@/components/screen-header';
-import { useProgress } from '@/contexts/progress-context';
-import { useTrip } from '@/contexts/trip-context';
+import { Body, Eyebrow, Heading, Panel, Pill, Empty } from '@/components/ui';
+import { CheckButton } from '@/components/check-button';
+import { TripState } from '@/components/trip-state';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDate } from '@/lib/format';
-import { FontSize, Radius, Spacing } from '@/constants/theme';
-import type { Meal } from '@/types/trip';
-
-const MEALS: { key: Meal; label: string; icon: string; image: string }[] = [
-  {
-    key: 'Breakfast',
-    label: 'Breakfast',
-    icon: 'cafe',
-    image: 'https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?w=400&h=400&fit=crop&q=80',
-  },
-  {
-    key: 'Lunch',
-    label: 'Lunch',
-    icon: 'restaurant',
-    image: 'https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?w=400&h=400&fit=crop&q=80',
-  },
-  {
-    key: 'Dinner',
-    label: 'Dinner',
-    icon: 'wine',
-    image: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop&q=80',
-  },
-  {
-    key: 'Drinks',
-    label: 'Drinks',
-    icon: 'beer',
-    image: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=400&h=400&fit=crop&q=80',
-  },
-];
-
-export default function FoodScreen() {
+import { useTrip } from '@/contexts/trip-context';
+import { useProgress } from '@/contexts/progress-context';
+export default function Food() {
   const t = useTheme();
-  const { trip, currentTripData } = useTrip();
+  const { width } = useWindowDimensions();
+  const { currentTripData: data } = useTrip();
   const { isDone, toggle } = useProgress();
-  const [selected, setSelected] = useState<Meal>('Breakfast');
-  const range = `${formatDate(trip.startDate)} – ${formatDate(trip.endDate)}`;
-
-  if (!currentTripData) {
-    return (
-      <Screen>
-        <View style={[styles.loading, { backgroundColor: t.background }]}>
-          <ActivityIndicator size="large" color={t.accent} />
-          <Text style={[styles.loadingTitle, { color: t.text }]}>Loading restaurants…</Text>
-          <Text style={[styles.loadingSub, { color: t.textSecondary }]}>Finding real places to eat & drink.</Text>
-        </View>
-      </Screen>
-    );
-  }
-
-  const data = currentTripData;
-  const items = data.restaurants.filter((r) => r.meal === selected);
-
+  const [selected, setSelected] = useState('All tables');
+  const [query, setQuery] = useState('');
+  if (!data) return <TripState />;
+  const groups = ['All tables', 'Cafés', 'Restaurants', 'Drinks', 'Tried & loved'];
+  const match = (r: (typeof data.restaurants)[number]) =>
+    selected === 'All tables' ||
+    (selected === 'Cafés' && r.meal === 'Breakfast') ||
+    (selected === 'Restaurants' && ['Lunch', 'Dinner'].includes(r.meal)) ||
+    (selected === 'Drinks' && r.meal === 'Drinks') ||
+    (selected === 'Tried & loved' && isDone(r.id));
+  const items = data.restaurants.filter(
+    (r) => match(r) && (r.name + ' ' + r.cuisine).toLowerCase().includes(query.toLowerCase()),
+  );
   return (
     <Screen>
-      <ScreenHeader icon="restaurant" title="Eat & drink" subtitle={`${trip.destination} · ${range}`} />
-
-      <View style={styles.grid}>
-        {MEALS.map((m) => {
-          const active = m.key === selected;
-          const count = data.restaurants.filter((r) => r.meal === m.key).length;
-          return (
-            <Pressable
-              key={m.key}
-              onPress={() => setSelected(m.key)}
-              style={({ pressed }) => [
-                styles.card,
-                {
-                  opacity: pressed ? 0.85 : 1,
-                  borderWidth: active ? 2 : 0,
-                  borderColor: active ? t.accent : 'transparent',
-                },
-              ]}>
-              <Image source={{ uri: m.image }} contentFit="cover" transition={300} style={styles.cardImage} />
-              <View style={styles.cardOverlay}>
-                <Ionicons name={m.icon as any} size={22} color="#FFFFFF" />
-                <Text style={styles.cardLabel}>{m.label}</Text>
-                <Text style={styles.cardCount}>{count} places</Text>
-              </View>
-            </Pressable>
-          );
-        })}
+      <View style={{ gap: 8 }}>
+        <Eyebrow>A TASTE OF THE NEIGHBOURHOOD</Eyebrow>
+        <Heading large>Good days start at a table.</Heading>
+        <Body>
+          Morning coffee, long lunches, one more glass. Find your own favourites in{' '}
+          {data.destination}.
+        </Body>
       </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipScroll}
-        style={styles.chipBar}>
-        {MEALS.map((m) => {
-          const active = m.key === selected;
-          return (
-            <Pressable
-              key={m.key}
-              onPress={() => setSelected(m.key)}
-              style={({ pressed }) => [
-                styles.chip,
-                {
-                  backgroundColor: active ? t.accent : t.hairline,
-                  opacity: pressed ? 0.7 : 1,
-                },
-              ]}>
-              <Ionicons name={m.icon as any} size={14} color={active ? t.badgeText : t.textSecondary} />
-              <Text style={[styles.chipLabel, { color: active ? t.badgeText : t.textSecondary }]}>
-                {m.key}
-              </Text>
-            </Pressable>
-          );
-        })}
-        {/* Spacer to allow last chip to reach screen edge */}
-        <View style={styles.chipSpacer} />
-      </ScrollView>
-
-      <View style={styles.list}>
-        {items.map((r) => {
-          const checked = isDone(r.id);
-          return (
-            <Pressable key={r.id} onPress={() => r.url && Linking.openURL(r.url)}>
-            <Card>
-              <View style={styles.cardRow}>
-                <View style={[styles.iconWrap, { backgroundColor: t.accentSoft }]}>
-                  <Ionicons name={r.icon} size={20} color={t.accent} />
-                </View>
-                <View style={[styles.grow, checked && { opacity: 0.55 }]}>
-                  <View style={styles.titleRow}>
-                    <Text style={[styles.name, { color: t.text }]} numberOfLines={1}>
-                      {r.name}
-                    </Text>
-                    {r.isMustTry ? <Badge label="Must-try" /> : null}
-                  </View>
-                  <Text style={[styles.meta, { color: t.textSecondary }]} numberOfLines={1}>
-                    {r.cuisine} · {'€'.repeat(r.priceLevel)} · {r.neighborhood}
-                  </Text>
-                  <Rating value={r.rating} />
-                </View>
-                <CheckButton checked={checked} onToggle={() => toggle(r.id)} />
+      <Panel
+        style={{
+          backgroundColor: t.accentSoft,
+          borderColor: t.accentSoft,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 20,
+        }}
+      >
+        <Ionicons name="restaurant-outline" size={28} color={t.accent} />
+        <View style={{ flex: 1, gap: 5 }}>
+          <Text style={{ fontSize: 16, color: t.text, fontWeight: '600' }}>
+            Local tables. Real discoveries.
+          </Text>
+          <Body>
+            Independent cafés, restaurants, and bars from OpenStreetMap. Check opening hours before
+            visiting.
+          </Body>
+        </View>
+      </Panel>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {groups.map((g) => (
+          <Pill key={g} label={g} active={selected === g} onPress={() => setSelected(g)} />
+        ))}
+      </View>
+      <TextInput
+        accessibilityLabel="Search restaurants"
+        placeholder="Search by name or cuisine…"
+        placeholderTextColor={t.placeholder}
+        value={query}
+        onChangeText={setQuery}
+        style={{
+          backgroundColor: t.card,
+          padding: 15,
+          borderWidth: 1,
+          borderColor: t.hairline,
+          borderRadius: 10,
+          color: t.text,
+          fontSize: 13,
+        }}
+      />
+      {!items.length && (
+        <Empty
+          title={
+            data.restaurants.length
+              ? 'Room for a new favourite.'
+              : 'The tables are still being set.'
+          }
+          description={
+            data.restaurants.length
+              ? 'Try a different filter, or check off a place after your visit.'
+              : 'Restaurant data is unavailable for this journey. Explore the city map for local dining options.'
+          }
+        />
+      )}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 18 }}>
+        {items.map((r, i) => (
+          <Panel
+            key={r.id}
+            style={{
+              width: width > 1000 ? '31.9%' : width > 700 ? '48.4%' : '100%',
+              padding: 22,
+              gap: 18,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  backgroundColor: t.accentSoft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Ionicons name={r.icon} size={21} color={t.accent} />
               </View>
-              <Text
-                style={[styles.desc, { color: t.textSecondary, opacity: checked ? 0.55 : 1 }]}>
-                {r.description}
+              <CheckButton
+                checked={isDone(r.id)}
+                label={`Mark ${r.name} as tried`}
+                onToggle={() => toggle(r.id)}
+              />
+            </View>
+            <View style={{ gap: 9 }}>
+              <Eyebrow>
+                {r.meal === 'Breakfast'
+                  ? 'COFFEE & SLOW MORNINGS'
+                  : r.meal === 'Drinks'
+                    ? 'ONE MORE GLASS'
+                    : 'A SEAT AT THE TABLE'}
+              </Eyebrow>
+              <Text style={{ fontSize: 19, lineHeight: 27, color: t.text, fontWeight: '600' }}>
+                {r.name}
               </Text>
-              {r.url ? (
+              <Text style={{ color: t.accent, fontSize: 12 }}>
+                {r.cuisine}
+                {r.priceLevel ? ' · ' + '€'.repeat(r.priceLevel) : ''}
+              </Text>
+            </View>
+            <Text
+              style={{ fontSize: 12, color: t.textSecondary, lineHeight: 21 }}
+              numberOfLines={3}
+            >
+              {r.description}
+            </Text>
+            <View
+              style={{
+                marginTop: 'auto',
+                paddingTop: 16,
+                borderTopWidth: 1,
+                borderColor: t.hairline,
+                gap: 10,
+              }}
+            >
+              <Text numberOfLines={1} style={{ color: t.textSecondary, fontSize: 11 }}>
+                <Ionicons name="location-outline" size={12} /> {r.neighborhood}
+              </Text>
+              {r.url && (
                 <Pressable onPress={() => Linking.openURL(r.url!).catch(() => {})}>
-                  <Text style={[styles.viewLink, { color: t.accent }]}>View on Maps →</Text>
+                  <Text style={{ color: t.accent, fontSize: 12, fontWeight: '600' }}>
+                    Find your table ↗
+                  </Text>
                 </Pressable>
-              ) : null}
-            </Card>
-            </Pressable>
-          );
-        })}
+              )}
+            </View>
+          </Panel>
+        ))}
       </View>
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.md,
-    marginTop: Spacing.lg,
-  },
-  card: {
-    width: '48%' as any,
-    height: 150,
-    borderRadius: Radius.lg,
-    overflow: 'hidden',
-  },
-  cardImage: {
-    width: '100%',
-    height: '100%',
-  },
-  cardOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
-    padding: Spacing.md,
-    gap: 4,
-  },
-  cardLabel: {
-    color: '#FFFFFF',
-    fontSize: FontSize.label,
-    fontWeight: '800',
-  },
-  cardCount: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: FontSize.caption,
-    fontWeight: '500',
-  },
-  chipBar: {
-    marginTop: Spacing.xl,
-  },
-  chipScroll: {
-    gap: Spacing.sm,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    borderRadius: 999,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-  },
-  chipLabel: {
-    fontSize: FontSize.small,
-    fontWeight: '700',
-  },
-  chipSpacer: {
-    width: Spacing.lg * 4, // Allow last chip to reach screen edge
-  },
-  list: {
-    gap: Spacing.md,
-    marginTop: Spacing.xl,
-  },
-  cardRow: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-    alignItems: 'center',
-  },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  grow: {
-    flex: 1,
-    gap: 3,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  name: {
-    fontSize: FontSize.label,
-    fontWeight: '800',
-    flexShrink: 1,
-  },
-  meta: {
-    fontSize: FontSize.small,
-  },
-  desc: {
-    fontSize: FontSize.small,
-    lineHeight: 19,
-  },
-  viewLink: {
-    fontSize: FontSize.small,
-    fontWeight: '700',
-    marginTop: Spacing.sm,
-    textAlign: 'right',
-  },
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.lg,
-    paddingHorizontal: Spacing.xxl,
-  },
-  loadingTitle: {
-    fontSize: FontSize.label,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  loadingSub: {
-    fontSize: FontSize.small,
-    textAlign: 'center',
-  },
-});

@@ -1,118 +1,64 @@
-/**
- * Design tokens for Norte Trip Planner.
- * Extended from the Expo default template theme (SDK 54).
- */
-
 import { Platform } from 'react-native';
-
-// Brand accent — deep emerald-teal, inspired by the "Norte" / Douro landscape.
-const accentLight = '#0E7C66';
-const accentDark = '#35D6B2';
-
 export const Colors = {
   light: {
-    text: '#101113',
-    textSecondary: '#6A7078',
-    background: '#F6F6F4',
+    text: '#272D25',
+    textSecondary: '#777A6E',
+    background: '#F7F7F2',
     card: '#FFFFFF',
-    hairline: '#ECECE8',
-    tint: accentLight,
-    accent: accentLight,
-    accentSoft: '#E0F2EC',
-    icon: '#6A7078',
-    tabIconDefault: '#A8ADB2',
-    tabIconSelected: accentLight,
-    placeholder: '#9BA1A8',
-    badge: accentLight,
+    hairline: '#E5E6DC',
+    tint: '#566344',
+    accent: '#566344',
+    accentSoft: '#EBEEE4',
+    icon: '#838778',
+    tabIconDefault: '#8B8F82',
+    tabIconSelected: '#566344',
+    placeholder: '#999D91',
+    badge: '#566344',
     badgeText: '#FFFFFF',
-    rating: '#E5A83B',
-    danger: '#C0392B',
-    overlay: 'rgba(16,17,19,0.45)',
-    shadow: '#000000',
+    rating: '#B98A42',
+    danger: '#B44F39',
+    overlay: 'rgba(30,36,26,.4)',
+    shadow: '#20281A',
   },
   dark: {
-    text: '#F2F3F1',
-    textSecondary: '#A7ADB2',
-    background: '#0D0F0E',
-    card: '#171A18',
-    hairline: '#262B29',
-    tint: accentDark,
-    accent: accentDark,
-    accentSoft: '#12312B',
-    icon: '#A7ADB2',
-    tabIconDefault: '#5C625F',
-    tabIconSelected: accentDark,
-    placeholder: '#5C625F',
-    badge: accentDark,
-    badgeText: '#06231D',
-    rating: '#E5A83B',
-    danger: '#E0655A',
-    overlay: 'rgba(0,0,0,0.55)',
+    text: '#ECEEE4',
+    textSecondary: '#A3AB98',
+    background: '#171C16',
+    card: '#22291F',
+    hairline: '#363E30',
+    tint: '#B7C79B',
+    accent: '#B7C79B',
+    accentSoft: '#323D29',
+    icon: '#A3AB98',
+    tabIconDefault: '#87917B',
+    tabIconSelected: '#B7C79B',
+    placeholder: '#87917B',
+    badge: '#B7C79B',
+    badgeText: '#20281A',
+    rating: '#D3AA63',
+    danger: '#EF967E',
+    overlay: 'rgba(0,0,0,.5)',
     shadow: '#000000',
   },
 } as const;
-
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-});
-
-export const Spacing = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
-  xxl: 32,
-  huge: 40,
-} as const;
-
-export const Radius = {
-  sm: 10,
-  md: 14,
-  lg: 20,
-  xl: 26,
-} as const;
-
+export const Fonts = {
+  sans:
+    Platform.OS === 'web'
+      ? 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+      : 'System',
+  serif: Platform.OS === 'ios' ? 'Georgia' : Platform.OS === 'web' ? 'Georgia, serif' : 'serif',
+  rounded: 'System',
+  mono: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+};
+export const Spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, huge: 40 } as const;
+export const Radius = { sm: 8, md: 12, lg: 18, xl: 24 } as const;
 export const FontSize = {
-  caption: 12,
+  caption: 11,
   small: 13,
   body: 15,
   label: 17,
-  title: 22,
-  huge: 30,
-  display: 40,
+  title: 24,
+  huge: 34,
+  display: 48,
 } as const;
-
-export const CardShadow = Platform.select({
-  ios: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-  },
-  android: {
-    elevation: 2,
-  },
-  default: {},
-});
+export const CardShadow = { boxShadow: '0 5px 24px rgba(40,48,28,0.04)' };

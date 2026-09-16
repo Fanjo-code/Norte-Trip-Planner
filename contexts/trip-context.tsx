@@ -5,206 +5,199 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
-
 import type { SavedTrip, Trip } from '@/types/trip';
-
+import { addDays, localISO, parseDate } from '@/lib/format';
 export const TRIPS_KEY = 'norte.trips.v1';
 const DATA_PREFIX = 'norte.tripdata.v1:';
-
+const SELECTED_KEY = 'norte.selected.v1';
 export interface TripState {
   id: string;
   destination: string;
   startDate: Date;
   endDate: Date;
 }
-
-interface TripContextValue {
+interface Value {
   trips: SavedTrip[];
   trip: TripState;
-  /** AI-generated trip plan for the current trip. null = not yet generated. */
   currentTripData: Trip | null;
-  /** Whether trip data is currently being generated. */
   isGenerating: boolean;
-  addTrip: (input: { destination: string; startDate: Date; endDate: Date }) => string;
+  isLoading: boolean;
+  storageError: string | null;
+  addTrip: (input: { destination: string; startDate: Date; endDate: Date }, data?: Trip) => string;
   selectTrip: (id: string) => void;
   setTripData: (id: string, data: Trip) => void;
   setGenerating: (v: boolean) => void;
   deleteTrip: (id: string) => void;
 }
-
-const TripContext = createContext<TripContextValue | null>(null);
-
-function makeId(destination: string): string {
-  const slug = destination.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return `${slug || 'trip'}-${Date.now()}`;
-}
-
-function seedTrip(): SavedTrip {
-  const start = new Date(2026, 7, 12);
-  const end = new Date(2026, 7, 16);
-  return {
-    id: makeId('Porto'),
-    destination: 'Porto',
-    startDateISO: start.toISOString(),
-    endDateISO: end.toISOString(),
-  };
-}
-
+const Context = createContext<Value | null>(null);
 export function TripProvider({ children }: { children: ReactNode }) {
   const [trips, setTrips] = useState<SavedTrip[]>([]);
-  const [loaded, setLoaded] = useState(false);
   const [currentId, setCurrentId] = useState<string | null>(null);
-  const [currentTripData, setCurrentTripData] = useState<Trip | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  // Load persisted trips.
+  const [dataMap, setDataMap] = useState<Record<string, Trip>>({});
+  const [loaded, setLoaded] = useState(false);
+  const [isGenerating, setGenerating] = useState(false);
+  const [storageError, setStorageError] = useState<string | null>(null);
+  const queue = useRef(Promise.resolve());
+  const persist = useCallback((job: () => Promise<void>) => {
+    queue.current = queue.current
+      .then(job)
+      .catch(() =>
+        setStorageError(
+          'These changes could not be saved on this device. Keep Norte open and check your available storage.',
+        ),
+      );
+  }, []);
   useEffect(() => {
-    let mounted = true;
+    let active = true;
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(TRIPS_KEY);
-        if (mounted) {
-          if (raw) {
-            const stored = JSON.parse(raw) as SavedTrip[];
-            setTrips(stored);
-            setCurrentId(stored[0]?.id ?? null);
-          } else {
-            const seeded = [seedTrip()];
-            setTrips(seeded);
-            setCurrentId(seeded[0].id);
-            await AsyncStorage.setItem(TRIPS_KEY, JSON.stringify(seeded));
-          }
+        const parsed: SavedTrip[] = raw ? JSON.parse(raw) : [];
+        const valid = Array.isArray(parsed)
+          ? parsed.filter(
+              (x) =>
+                x &&
+                x.id &&
+                x.destination &&
+                Number.isFinite(new Date(x.startDateISO).getTime()) &&
+                Number.isFinite(new Date(x.endDateISO).getTime()),
+            )
+          : [];
+        const pairs = await AsyncStorage.multiGet(valid.map((x) => DATA_PREFIX + x.id));
+        const map: Record<string, Trip> = {};
+        for (const [key, val] of pairs) {
+          try {
+            const d = val ? JSON.parse(val) : null;
+            if (
+              d &&
+              Array.isArray(d.places) &&
+              Array.isArray(d.itinerary) &&
+              Array.isArray(d.restaurants) &&
+              Array.isArray(d.transport)
+            )
+              map[key.slice(DATA_PREFIX.length)] = d;
+          } catch {}
+        }
+        const selectedId = await AsyncStorage.getItem(SELECTED_KEY);
+        if (active) {
+          setTrips(valid);
+          setDataMap(map);
+          setCurrentId(
+            valid.some((t) => t.id === selectedId) ? selectedId : (valid[0]?.id ?? null),
+          );
         }
       } catch {
-        const seeded = [seedTrip()];
-        if (mounted) {
-          setTrips(seeded);
-          setCurrentId(seeded[0].id);
-        }
+        if (active)
+          setStorageError(
+            'Saved journeys could not be read. Your existing storage has been left untouched.',
+          );
       } finally {
-        if (mounted) setLoaded(true);
+        if (active) setLoaded(true);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      active = false;
+    };
   }, []);
-
-  // Persist trips list.
-  useEffect(() => {
-    if (loaded) AsyncStorage.setItem(TRIPS_KEY, JSON.stringify(trips)).catch(() => {});
-  }, [trips, loaded]);
-
-  // Load trip data when current trip changes.
-  useEffect(() => {
-    if (!currentId || !loaded) {
-      setCurrentTripData(null);
-      return;
-    }
-    let mounted = true;
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(DATA_PREFIX + currentId);
-        if (mounted) setCurrentTripData(raw ? JSON.parse(raw) : null);
-      } catch {
-        if (mounted) setCurrentTripData(null);
-      }
-    })();
-    return () => { mounted = false; };
-  }, [currentId, loaded]);
-
-  const setTripData = useCallback((id: string, data: Trip) => {
-    setCurrentTripData(data);
-    AsyncStorage.setItem(DATA_PREFIX + id, JSON.stringify(data)).catch(() => {});
-  }, []);
-
   const addTrip = useCallback(
-    (input: { destination: string; startDate: Date; endDate: Date }) => {
-      const id = makeId(input.destination);
-      const saved: SavedTrip = {
+    (input: { destination: string; startDate: Date; endDate: Date }, data?: Trip) => {
+      const id = 'trip-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+      const saved = {
         id,
         destination: input.destination.trim(),
-        startDateISO: input.startDate.toISOString(),
-        endDateISO: input.endDate.toISOString(),
+        startDateISO: localISO(input.startDate),
+        endDateISO: localISO(input.endDate),
       };
       setTrips((prev) => [saved, ...prev]);
       setCurrentId(id);
-      setCurrentTripData(null);
+      if (data) setDataMap((prev) => ({ ...prev, [id]: data }));
+      persist(async () => {
+        const raw = await AsyncStorage.getItem(TRIPS_KEY);
+        const prev = raw ? JSON.parse(raw) : [];
+        await AsyncStorage.multiSet([
+          [TRIPS_KEY, JSON.stringify([saved, ...(Array.isArray(prev) ? prev : [])])],
+          ...(data ? [[DATA_PREFIX + id, JSON.stringify(data)] as [string, string]] : []),
+        ]);
+      });
       return id;
     },
-    []
+    [persist],
   );
-
-  const selectTrip = useCallback((id: string) => {
-    setCurrentId(id);
-  }, []);
-
+  const setTripData = useCallback(
+    (id: string, data: Trip) => {
+      setDataMap((prev) => ({ ...prev, [id]: data }));
+      persist(() => AsyncStorage.setItem(DATA_PREFIX + id, JSON.stringify(data)));
+    },
+    [persist],
+  );
   const deleteTrip = useCallback(
     (id: string) => {
-      setTrips((prev) => prev.filter((t) => t.id !== id));
-      // Also delete the trip data
-      AsyncStorage.removeItem(DATA_PREFIX + id).catch(() => {});
-      // If we're deleting the current trip, switch to another one
-      if (currentId === id) {
-        const remaining = trips.filter((t) => t.id !== id);
-        setCurrentId(remaining[0]?.id ?? null);
-        setCurrentTripData(null);
-      }
+      setTrips((prev) => prev.filter((x) => x.id !== id));
+      setDataMap((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setCurrentId((prev) => (prev === id ? null : prev));
+      persist(async () => {
+        const raw = await AsyncStorage.getItem(TRIPS_KEY);
+        const list = raw ? JSON.parse(raw) : [];
+        await AsyncStorage.setItem(
+          TRIPS_KEY,
+          JSON.stringify(list.filter((x: SavedTrip) => x.id !== id)),
+        );
+        await AsyncStorage.multiRemove([DATA_PREFIX + id, 'norte.note.v1:' + id]);
+      });
     },
-    [currentId, trips]
+    [persist],
   );
-
-  const trip = useMemo<TripState>(() => {
-    const current = trips.find((t) => t.id === currentId);
-    if (current) {
-      return {
-        id: current.id,
-        destination: current.destination,
-        startDate: new Date(current.startDateISO),
-        endDate: new Date(current.endDateISO),
-      };
-    }
-    const first = trips[0];
-    if (first) {
-      return {
-        id: first.id,
-        destination: first.destination,
-        startDate: new Date(first.startDateISO),
-        endDate: new Date(first.endDateISO),
-      };
-    }
-    const seeded = seedTrip();
-    return {
-      id: seeded.id,
-      destination: seeded.destination,
-      startDate: new Date(seeded.startDateISO),
-      endDate: new Date(seeded.endDateISO),
-    };
-  }, [trips, currentId]);
-
-  const value = useMemo<TripContextValue>(
-    () => ({
-      trips,
-      trip,
-      currentTripData,
-      isGenerating,
-      addTrip,
-      selectTrip,
-      setTripData,
-      setGenerating: setIsGenerating,
-      deleteTrip,
-    }),
-    [trips, trip, currentTripData, isGenerating, addTrip, selectTrip, setTripData, deleteTrip]
+  useEffect(() => {
+    if (loaded && currentId) persist(() => AsyncStorage.setItem(SELECTED_KEY, currentId));
+  }, [loaded, currentId, persist]);
+  const selected = trips.find((x) => x.id === currentId) ?? trips[0];
+  const trip = useMemo<TripState>(
+    () =>
+      selected
+        ? {
+            id: selected.id,
+            destination: selected.destination,
+            startDate: parseDate(selected.startDateISO),
+            endDate: parseDate(selected.endDateISO),
+          }
+        : {
+            id: '',
+            destination: 'Your next city',
+            startDate: new Date(),
+            endDate: addDays(new Date(), 3),
+          },
+    [selected],
   );
-
-  return <TripContext.Provider value={value}>{children}</TripContext.Provider>;
+  return (
+    <Context.Provider
+      value={{
+        trips,
+        trip,
+        currentTripData: dataMap[trip.id] ?? null,
+        isLoading: !loaded,
+        isGenerating,
+        storageError,
+        addTrip,
+        selectTrip: setCurrentId,
+        setTripData,
+        setGenerating,
+        deleteTrip,
+      }}
+    >
+      {children}
+    </Context.Provider>
+  );
 }
-
 export function useTrip() {
-  const ctx = useContext(TripContext);
-  if (!ctx) {
-    throw new Error('useTrip must be used within a TripProvider');
-  }
-  return ctx;
+  const c = useContext(Context);
+  if (!c) throw new Error('TripProvider missing');
+  return c;
 }

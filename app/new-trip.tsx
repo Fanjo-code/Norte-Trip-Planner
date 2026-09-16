@@ -1,373 +1,335 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-
-import { Card } from '@/components/card';
-import { DateField, TextField } from '@/components/field';
-import { PrimaryButton } from '@/components/primary-button';
+import { Image } from 'expo-image';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { Screen } from '@/components/screen';
-import {
-  BUDGET_LABELS,
-  INTEREST_LABELS,
-  PACE_LABELS,
-  usePreferences,
-} from '@/contexts/preferences-context';
-import { useTrip } from '@/contexts/trip-context';
+import { Action, Body, Eyebrow, Heading, Panel, Pill } from '@/components/ui';
+import { DateField, TextField } from '@/components/field';
 import { useTheme } from '@/hooks/use-theme';
-import { PRIORITY_OPTIONS, type Priority } from '@/data/flexible-suggestions';
-import { generateTrip as generateAITrip, type AiError } from '@/services/ai';
-import { generateTrip as generateLiveTrip } from '@/services/travel';
-import type { Trip } from '@/types/trip';
-import { FontSize, Radius, Spacing } from '@/constants/theme';
-
-const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const DURATIONS = [3, 5, 7, 10, 14];
-
-const LOADING_TIPS = [
-  "We're building your trip for you — this might take a minute.",
-  'Finding the best places, restaurants, and hidden gems…',
-  'Picking the best dates and planning each day…',
-  'Almost there — putting the finishing touches on your trip…',
-];
-
-function defaultEnd(): Date {
-  const d = new Date();
-  d.setDate(d.getDate() + 3);
-  return d;
-}
-
-export default function NewTripScreen() {
+import { useTrip } from '@/contexts/trip-context';
+import { usePreferences, PACE_LABELS, BUDGET_LABELS } from '@/contexts/preferences-context';
+import { generateTrip } from '@/services/travel';
+import { enrichTrip, isAiAvailable } from '@/services/ai';
+import { addDays, daysBetween, formatDateRange, localISO } from '@/lib/format';
+import { getDestinationImage } from '@/data/destinations';
+const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export default function NewTrip() {
   const t = useTheme();
-  const { addTrip, setTripData, setGenerating } = useTrip();
-  const { prefs, hasCustomized } = usePreferences();
-
-  const [destination, setDestination] = useState('');
+  const { width } = useWindowDimensions();
+  const params = useLocalSearchParams<{ destination?: string }>();
+  const [destination, setDestination] = useState(params.destination ?? '');
+  const { prefs } = usePreferences();
+  const { addTrip, setGenerating } = useTrip();
+  const [start, setStart] = useState(addDays(new Date(), 1));
+  const [end, setEnd] = useState(addDays(new Date(), 4));
   const [mode, setMode] = useState<'exact' | 'flexible'>('exact');
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(defaultEnd);
-  const [flexMonth, setFlexMonth] = useState(new Date().getMonth());
-  const [flexDuration, setFlexDuration] = useState(7);
-  const [selectedPriority, setSelectedPriority] = useState<Priority>('recommended');
-  const [errors, setErrors] = useState<{ destination?: string }>({});
+  const [month, setMonth] = useState(new Date().getMonth());
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [duration, setDuration] = useState(5);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [aiError, setAiError] = useState<AiError | null>(null);
-  const [loadingTip, setLoadingTip] = useState(0);
-
-  // Rotate friendly "hang tight" messages while the trip is being built.
+  const [error, setError] = useState('');
+  const [step, setStep] = useState(0);
+  const abort = useRef<AbortController | null>(null);
+  const [aiAvailable, setAiAvailable] = useState(false);
+  const [useAi, setUseAi] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void isAiAvailable().then((value) => {
+      if (active) setAiAvailable(value);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+  useEffect(
+    () => () => {
+      abort.current?.abort();
+    },
+    [],
+  );
   useEffect(() => {
     if (!loading) return;
-    const id = setInterval(() => setLoadingTip((i) => (i + 1) % LOADING_TIPS.length), 4000);
-    return () => clearInterval(id);
+    const timer = setInterval(() => setStep((s) => Math.min(2, s + 1)), 6500);
+    return () => clearInterval(timer);
   }, [loading]);
-
+  let flexibleStart = new Date(year, month, 1, 12);
+  if (localISO(flexibleStart) < localISO(new Date())) flexibleStart = addDays(new Date(), 1);
+  while (flexibleStart.getDay() !== 2) flexibleStart = addDays(flexibleStart, 1);
+  const flexibleEnd = addDays(flexibleStart, duration - 1);
+  const flexibleValid = flexibleStart.getMonth() === month && flexibleEnd.getMonth() === month;
+  const finalStart = mode === 'exact' ? start : flexibleStart,
+    finalEnd = mode === 'exact' ? end : flexibleEnd;
   const handlePlan = async () => {
     if (!destination.trim()) {
-      setErrors({ destination: 'Enter a destination' });
+      setError('Where would you like to go? Enter a city name.');
       return;
     }
-    setErrors({});
-    setError(null);
-    setAiError(null);
+    if (
+      !Number.isFinite(finalStart.getTime()) ||
+      !Number.isFinite(finalEnd.getTime()) ||
+      localISO(finalEnd) < localISO(finalStart) ||
+      localISO(finalStart) < localISO(new Date())
+    ) {
+      setError('Choose a start date from today onwards, with an end date on or after it.');
+      return;
+    }
+    if (mode === 'flexible' && !flexibleValid) {
+      setError('There isn’t enough room left in this month. Choose another month.');
+      return;
+    }
+    if (daysBetween(finalStart, finalEnd) > 30) {
+      setError('Keep each city journey to 30 days or fewer.');
+      return;
+    }
+    const controller = new AbortController();
+    abort.current = controller;
     setLoading(true);
     setGenerating(true);
-
-    const year = new Date().getFullYear();
-
-    // Final dates: user's exact dates in exact mode; in flexible mode the AI picks them.
-    let finalStart = startDate;
-    let finalEnd = endDate;
-    let tripData: Trip | null = null;
-
+    setError('');
+    setStep(0);
     try {
-      if (mode === 'flexible') {
-        // AI chooses the best dates within the month + picks the trip details.
-        setError('AI is finding the best dates and building your trip…');
-        const gen = await generateAITrip(destination.trim(), null, null, prefs, {
-          month: flexMonth,
-          year,
-          durationDays: flexDuration,
-          priority: selectedPriority,
-        });
-        if (gen) {
-          tripData = gen.trip;
-          if (gen.startDate) {
-            finalStart = gen.startDate;
-            finalEnd = gen.endDate ?? gen.startDate;
-          }
+      let data = await generateTrip(
+        destination.trim(),
+        finalStart,
+        finalEnd,
+        prefs,
+        controller.signal,
+      );
+      if (controller.signal.aborted) return;
+      if (!data) throw new Error('No plan was returned. Please try again.');
+      if (useAi) {
+        try {
+          data = await enrichTrip(data, prefs, controller.signal);
+        } catch {
+          if (controller.signal.aborted) return;
+          data = {
+            ...data,
+            notes: [
+              ...(data.notes ?? []),
+              'AI editing was unavailable. Your complete live-data plan is ready.',
+            ],
+          };
         }
-      } else {
-        setError('AI is researching your trip…');
-        const gen = await generateAITrip(destination.trim(), startDate, endDate, prefs);
-        if (gen) tripData = gen.trip;
       }
-    } catch (err) {
-      setAiError(err as AiError);
-      console.error('[Plan] AI failed, trying live data:', (err as AiError)?.code ?? err);
-      setError('AI unavailable — fetching live data…');
-    }
-
-    // Live fallback if AI produced nothing (real API data, not mock).
-    if (!tripData) {
-      try {
-        let ls = finalStart;
-        let le = finalEnd;
-        if (mode === 'flexible') {
-          ls = new Date(year, flexMonth, 1);
-          le = new Date(year, flexMonth, flexDuration);
-        }
-        tripData = await generateLiveTrip(destination.trim(), ls, le, prefs);
-        if (tripData) {
-          finalStart = ls;
-          finalEnd = le;
-        }
-      } catch (e) {
-        console.error('[Plan] Live fallback failed:', e);
-        tripData = null;
-      }
-    }
-
-    if (tripData) {
-      const id = addTrip({ destination: destination.trim(), startDate: finalStart, endDate: finalEnd });
-      setTripData(id, tripData);
+      if (controller.signal.aborted) return;
+      addTrip({ destination: data.destination, startDate: finalStart, endDate: finalEnd }, data);
       router.replace('/(trip)/overview');
-    } else {
-      setError('Could not generate trip. Please try again.');
+    } catch (e) {
+      if (!controller.signal.aborted)
+        setError(
+          e instanceof Error && e.name !== 'AbortError'
+            ? e.message
+            : 'The city service took too long to respond. Please try again.',
+        );
+    } finally {
+      if (abort.current === controller) {
+        setLoading(false);
+        setGenerating(false);
+      }
     }
-
-    setLoading(false);
-    setGenerating(false);
   };
-
-  if (loading) {
-    let loadingSub = 'AI is thinking — researching the best places, food, and creating your itinerary…';
-    if (error?.includes('live data')) loadingSub = 'AI unavailable, fetching live data from free APIs…';
-    if (error?.includes('proxy')) loadingSub = 'Connecting to AI proxy…';
-    if (error?.includes('timed out')) loadingSub = 'AI taking longer than expected…';
-
-    return (
-      <View style={[styles.loading, { backgroundColor: t.background }]}>
-        <ActivityIndicator size="large" color={t.accent} />
-        <Text style={[styles.loadingTitle, { color: t.text }]}>
-          Building your trip to {destination || 'your destination'}…
-        </Text>
-        <Text style={[styles.loadingSub, { color: t.textSecondary }]}>{loadingSub}</Text>
-        <View style={styles.loadingNoteRow}>
-          <Ionicons name="sparkles" size={15} color={t.accent} />
-          <Text style={[styles.loadingNote, { color: t.textSecondary }]}>
-            {LOADING_TIPS[loadingTip]}
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
   return (
-    <Screen>
-      <View style={styles.header}>
-        <Pressable hitSlop={10} onPress={() => router.back()} style={styles.back}>
-          <Ionicons name="chevron-back" size={22} color={t.text} />
-        </Pressable>
-        <Text style={[styles.title, { color: t.text }]}>New trip</Text>
-      </View>
-      <Text style={[styles.subtitle, { color: t.textSecondary }]}>
-        Your trip in less than 2 minutes.
-      </Text>
-
-      {error ? (
-        <View style={[styles.errorBanner, { backgroundColor: '#FEE2E2' }]}>
-          <Ionicons name="alert-circle" size={16} color="#DC2626" />
-          <Text style={[styles.errorText, { color: '#DC2626' }]}>{error}</Text>
-          {aiError && aiError.code && (
-            <Text style={{ color: '#DC2626', fontSize: 11, marginTop: 2, fontFamily: 'monospace' }}>
-              Code: {aiError.code}{aiError.status ? ` (${aiError.status})` : ''}
-            </Text>
+    <Screen contentStyle={{ maxWidth: 1120 }}>
+      <Pressable
+        onPress={() => router.navigate('/')}
+        style={{ alignSelf: 'flex-start', flexDirection: 'row', gap: 7, alignItems: 'center' }}
+      >
+        <Ionicons name="arrow-back" size={15} color={t.accent} />
+        <Text style={{ fontSize: 12, color: t.accent }}>Back to your journeys</Text>
+      </Pressable>
+      <View style={{ flexDirection: width > 800 ? 'row' : 'column', gap: width > 800 ? 52 : 24 }}>
+        <View style={{ flex: 1.3, gap: 24 }}>
+          <View style={{ gap: 10 }}>
+            <Eyebrow>A NEW CHAPTER</Eyebrow>
+            <Heading large>Where to next?</Heading>
+            <Body>A few little details. A whole city of possibilities.</Body>
+          </View>
+          {loading ? (
+            <Panel style={{ paddingVertical: 48, alignItems: 'center', gap: 25 }}>
+              <ActivityIndicator size="large" color={t.accent} />
+              <Heading>Getting to know {destination}.</Heading>
+              <Body>
+                {
+                  [
+                    'Finding your city and its landmarks…',
+                    'Gathering local tables and neighbourhood favourites…',
+                    'Bringing your days together. Good things take a little time.',
+                  ][step]
+                }
+              </Body>
+              <Text style={{ color: t.textSecondary, fontSize: 12 }}>
+                Your plan uses real places, with room for spontaneity.
+              </Text>
+              <Action
+                label="Cancel planning"
+                subtle
+                onPress={() => {
+                  abort.current?.abort();
+                  setLoading(false);
+                  setGenerating(false);
+                }}
+              />
+            </Panel>
+          ) : (
+            <>
+              <Panel style={{ gap: 24 }}>
+                <TextField
+                  label="Which city is calling?"
+                  icon="location-outline"
+                  placeholder="Try Porto, Paris, or Rome…"
+                  value={destination}
+                  onChangeText={setDestination}
+                  autoCapitalize="words"
+                />
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pill
+                    label="I know my dates"
+                    active={mode === 'exact'}
+                    onPress={() => setMode('exact')}
+                  />
+                  <Pill
+                    label="I’m flexible"
+                    active={mode === 'flexible'}
+                    onPress={() => setMode('flexible')}
+                  />
+                </View>
+                {mode === 'exact' ? (
+                  <View style={{ flexDirection: width < 600 ? 'column' : 'row', gap: 16 }}>
+                    <DateField
+                      label="Arriving"
+                      value={start}
+                      minimumDate={new Date()}
+                      onChange={(d) => {
+                        setStart(d);
+                        if (d > end) setEnd(addDays(d, 3));
+                      }}
+                    />
+                    <DateField
+                      label="Heading home"
+                      value={end}
+                      minimumDate={start}
+                      onChange={setEnd}
+                    />
+                  </View>
+                ) : (
+                  <View style={{ gap: 16 }}>
+                    <Body>
+                      Start on a Tuesday, with a little more room to wander. Review the suggested
+                      dates below.
+                    </Body>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {[new Date().getFullYear(), new Date().getFullYear() + 1].map((y) => (
+                        <Pill
+                          key={y}
+                          label={String(y)}
+                          active={y === year}
+                          onPress={() => setYear(y)}
+                        />
+                      ))}
+                    </View>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+                      {months.map((m, i) => (
+                        <Pill key={m} label={m} active={i === month} onPress={() => setMonth(i)} />
+                      ))}
+                    </View>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      {[3, 5, 7, 10, 14].map((n) => (
+                        <Pill
+                          key={n}
+                          label={n + ' days'}
+                          active={duration === n}
+                          onPress={() => setDuration(n)}
+                        />
+                      ))}
+                    </View>
+                    <Text style={{ color: flexibleValid ? t.accent : t.danger, fontSize: 12 }}>
+                      {flexibleValid
+                        ? formatDateRange(flexibleStart, flexibleEnd)
+                        : 'Choose a later month for this length of trip.'}
+                    </Text>
+                  </View>
+                )}
+                <View style={{ height: 1, backgroundColor: t.hairline }} />
+                <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                  <Ionicons name="options-outline" size={20} color={t.accent} />
+                  <View style={{ flex: 1, gap: 5 }}>
+                    <Text style={{ fontSize: 13, color: t.text, fontWeight: '600' }}>
+                      A journey that feels like you
+                    </Text>
+                    <Text style={{ fontSize: 12, color: t.textSecondary }}>
+                      {PACE_LABELS[prefs.pace]} pace · {BUDGET_LABELS[prefs.budget]} dining
+                    </Text>
+                  </View>
+                  <Pressable onPress={() => router.push('/preferences')}>
+                    <Text style={{ fontSize: 12, color: t.accent }}>Edit ↗</Text>
+                  </Pressable>
+                </View>
+                {aiAvailable && (
+                  <View style={{ gap: 10 }}>
+                    <Pill
+                      label={useAi ? 'AI travel writing enabled' : 'Add AI travel writing'}
+                      active={useAi}
+                      onPress={() => setUseAi((v) => !v)}
+                    />
+                    <Text style={{ fontSize: 11, color: t.textSecondary }}>
+                      Optional: share this itinerary and your travel preferences with the configured
+                      AI provider to refine the writing.
+                    </Text>
+                  </View>
+                )}
+              </Panel>
+              {Boolean(error) && (
+                <View
+                  accessibilityRole="alert"
+                  style={{
+                    backgroundColor: t.card,
+                    padding: 18,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: t.danger,
+                    gap: 8,
+                  }}
+                >
+                  <Text selectable style={{ color: t.danger, fontSize: 13, lineHeight: 21 }}>
+                    {error}
+                  </Text>
+                  <Text style={{ color: t.textSecondary, fontSize: 12 }}>
+                    Your details are kept here so you can try again.
+                  </Text>
+                </View>
+              )}
+              <Action label="Create my journey" icon="arrow-forward" onPress={handlePlan} />
+              <Text style={{ textAlign: 'center', fontSize: 11, color: t.textSecondary }}>
+                No bookings. No rush. Just a very good plan.
+              </Text>
+            </>
           )}
         </View>
-      ) : null}
-
-      <Card style={styles.form}>
-        <TextField
-          label="Destination"
-          icon="location"
-          value={destination}
-          onChangeText={setDestination}
-          placeholder="Paris, Madrid, Rome…"
-          error={errors.destination}
-          autoCapitalize="words"
-          autoCorrect={false}
-        />
-
-        <View style={styles.modeToggle}>
-          <Pressable
-            onPress={() => setMode('exact')}
-            style={[styles.modeBtn, { backgroundColor: mode === 'exact' ? t.accent : t.hairline }]}>
-            <Text style={[styles.modeText, { color: mode === 'exact' ? '#FFF' : t.textSecondary }]}>
-              Exact dates
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setMode('flexible')}
-            style={[styles.modeBtn, { backgroundColor: mode === 'flexible' ? t.accent : t.hairline }]}>
-            <Text style={[styles.modeText, { color: mode === 'flexible' ? '#FFF' : t.textSecondary }]}>
-              Flexible month
-            </Text>
-          </Pressable>
-        </View>
-
-        {mode === 'exact' ? (
-          <>
-            <DateField label="Start date" value={startDate} onChange={setStartDate} minimumDate={new Date()} />
-            <DateField label="End date" value={endDate} onChange={setEndDate} minimumDate={startDate} icon="flag" />
-          </>
-        ) : (
-          <>
-            <Text style={[styles.fieldLabel, { color: t.textSecondary }]}>Month</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-              {MONTH_ABBR.map((m, i) => (
-                <Pressable key={m} onPress={() => setFlexMonth(i)} style={[styles.chip, { backgroundColor: i === flexMonth ? t.accent : t.hairline }]}>
-                  <Text style={[styles.chipText, { color: i === flexMonth ? '#FFF' : t.textSecondary }]}>{m}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-            <Text style={[styles.fieldLabel, { color: t.textSecondary }]}>Duration</Text>
-            <View style={styles.chipRow}>
-              {DURATIONS.map((d) => (
-                <Pressable key={d} onPress={() => setFlexDuration(d)} style={[styles.chip, { backgroundColor: d === flexDuration ? t.accent : t.hairline }]}>
-                  <Text style={[styles.chipText, { color: d === flexDuration ? '#FFF' : t.textSecondary }]}>{d} days</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={[styles.fieldLabel, { color: t.textSecondary }]}>What matters most?</Text>
-            <View style={styles.priorityRow}>
-              {PRIORITY_OPTIONS.map((p) => (
-                <Pressable
-                  key={p.value}
-                  onPress={() => setSelectedPriority(p.value)}
-                  style={[
-                    styles.priorityChip,
-                    { backgroundColor: selectedPriority === p.value ? t.accent : t.hairline },
-                  ]}>
-                  <Ionicons name={p.icon} size={16} color={selectedPriority === p.value ? '#FFF' : t.textSecondary} />
-                  <Text style={[styles.priorityChipText, { color: selectedPriority === p.value ? '#FFF' : t.textSecondary }]}>{p.label}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={[styles.flexHint, { color: t.textSecondary }]}>
-              The AI will find the best {PRIORITY_OPTIONS.find((p) => p.value === selectedPriority)?.label.toLowerCase()} dates in{' '}
-              {MONTH_ABBR[flexMonth]} for a {flexDuration}-day trip.
-            </Text>
-          </>
-        )}
-      </Card>
-
-      {/* Personalization */}
-      <Card style={styles.form}>
-        <View style={styles.prefHeaderRow}>
-          <Ionicons name="sparkles" size={16} color={t.accent} />
-          <Text style={[styles.prefTitle, { color: t.text }]}>Make it yours</Text>
-        </View>
-        {hasCustomized ? (
-          <>
-            <View style={styles.prefChips}>
-              {prefs.interests.length > 0
-                ? prefs.interests.map((i) => (
-                    <View key={i} style={[styles.prefChip, { backgroundColor: t.accentSoft }]}>
-                      <Text style={[styles.prefChipText, { color: t.accent }]}>{INTEREST_LABELS[i] ?? i}</Text>
-                    </View>
-                  ))
-                : null}
-              <View style={[styles.prefChip, { backgroundColor: t.hairline }]}>
-                <Text style={[styles.prefChipText, { color: t.textSecondary }]}>{PACE_LABELS[prefs.pace]} pace</Text>
-              </View>
-              <View style={[styles.prefChip, { backgroundColor: t.hairline }]}>
-                <Text style={[styles.prefChipText, { color: t.textSecondary }]}>{BUDGET_LABELS[prefs.budget]}</Text>
-              </View>
-            </View>
-            <Pressable onPress={() => router.push('/preferences')}>
-              <Text style={[styles.prefLink, { color: t.accent }]}>Edit preferences →</Text>
-            </Pressable>
-          </>
-        ) : (
-          <View style={styles.prefEmptyRow}>
-            <Text style={[styles.prefEmptyText, { color: t.textSecondary }]}>
-              Tell us what you love and your itinerary will match it.
-            </Text>
-            <Pressable onPress={() => router.push('/preferences')}>
-              <Text style={[styles.prefLink, { color: t.accent }]}>Personalize →</Text>
-            </Pressable>
+        <View style={{ flex: 1, gap: 24 }}>
+          <View style={{ borderRadius: 18, overflow: 'hidden' }}>
+            <Image
+              source={{ uri: getDestinationImage(destination) || getDestinationImage('porto')! }}
+              style={{ height: width > 800 ? 360 : 220 }}
+              contentFit="cover"
+            />
           </View>
-        )}
-      </Card>
-
-      <PrimaryButton label="Plan my trip" icon="sparkles" onPress={handlePlan} style={styles.cta} disabled={loading} />
+          <Panel style={{ backgroundColor: t.accentSoft, borderColor: t.accentSoft }}>
+            <Eyebrow>LESS ADMIN. MORE ADVENTURE.</Eyebrow>
+            <Heading>The details, considered.</Heading>
+            {[
+              ['map-outline', 'Real places worth your time'],
+              ['walk-outline', 'Sights grouped by neighbourhood'],
+              ['bookmark-outline', 'Your itinerary, saved for later'],
+            ].map(([icon, title]) => (
+              <View key={title} style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                <Ionicons name={icon as 'map-outline'} size={17} color={t.accent} />
+                <Text style={{ color: t.text, fontSize: 13 }}>{title}</Text>
+              </View>
+            ))}
+          </Panel>
+        </View>
+      </View>
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.lg,
-    paddingHorizontal: Spacing.xxl,
-  },
-  loadingTitle: {
-    fontSize: FontSize.label,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  loadingSub: {
-    fontSize: FontSize.small,
-    textAlign: 'center',
-  },
-  loadingNoteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.xl,
-    opacity: 0.9,
-  },
-  loadingNote: {
-    fontSize: FontSize.small,
-    fontWeight: '600',
-    textAlign: 'center',
-    flexShrink: 1,
-  },
-  header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginTop: Spacing.sm },
-  back: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: FontSize.huge, fontWeight: '800', letterSpacing: -0.5 },
-  subtitle: { fontSize: FontSize.small, marginTop: Spacing.xs, marginBottom: Spacing.xl },
-  form: { gap: Spacing.lg },
-  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md, borderRadius: Radius.md, marginBottom: Spacing.md },
-  errorText: { fontSize: FontSize.small, flex: 1 },
-  modeToggle: { flexDirection: 'row', gap: Spacing.sm },
-  modeBtn: { flex: 1, alignItems: 'center', paddingVertical: Spacing.md, borderRadius: Radius.md },
-  modeText: { fontSize: FontSize.small, fontWeight: '700' },
-  fieldLabel: { fontSize: FontSize.small, fontWeight: '600', marginLeft: Spacing.xs },
-  chipRow: { flexDirection: 'row', gap: Spacing.sm },
-  chip: { borderRadius: 999, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm },
-  chipText: { fontSize: FontSize.small, fontWeight: '700' },
-  flexHint: { fontSize: FontSize.caption, marginLeft: Spacing.xs },
-  cta: { marginTop: Spacing.xxl },
-  priorityRow: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' },
-  priorityChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    borderRadius: 999,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-  },
-  priorityChipText: { fontSize: FontSize.small, fontWeight: '700' },
-  prefHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  prefTitle: { fontSize: FontSize.label, fontWeight: '800' },
-  prefChips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  prefChip: { borderRadius: 999, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs },
-  prefChipText: { fontSize: FontSize.caption, fontWeight: '700' },
-  prefLink: { fontSize: FontSize.small, fontWeight: '700', marginTop: Spacing.sm },
-  prefEmptyRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  prefEmptyText: { flex: 1, fontSize: FontSize.small, fontWeight: '600' },
-});

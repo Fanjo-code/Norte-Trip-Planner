@@ -1,148 +1,163 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
-
-import { RouteMap } from '@/components/route-map';
+import { useEffect, useState } from 'react';
+import { Linking, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { Screen } from '@/components/screen';
-import { ScreenHeader } from '@/components/screen-header';
-import { TimelineItem } from '@/components/timeline-item';
-import { useProgress } from '@/contexts/progress-context';
-import { useTrip } from '@/contexts/trip-context';
+import { Action, Body, Eyebrow, Heading, Panel, Pill, ProgressBar } from '@/components/ui';
+import { CheckButton } from '@/components/check-button';
+import { TripState } from '@/components/trip-state';
+import { RouteMap } from '@/components/route-map';
 import { useTheme } from '@/hooks/use-theme';
+import { useTrip } from '@/contexts/trip-context';
+import { useProgress } from '@/contexts/progress-context';
+import { useCityProgress } from '@/contexts/city-progress-context';
 import { addDays, formatDate } from '@/lib/format';
-import { FontSize, Radius, Spacing } from '@/constants/theme';
-
-export default function ItineraryScreen() {
+import { mapsUrl } from '@/lib/places';
+export default function Itinerary() {
   const t = useTheme();
-  const { trip, currentTripData } = useTrip();
+  const { width } = useWindowDimensions();
+  const { trip, currentTripData: data } = useTrip();
   const { isDone, toggle } = useProgress();
-  const [currentDay, setCurrentDay] = useState(1);
-  const range = `${formatDate(trip.startDate)} – ${formatDate(trip.endDate)}`;
-
-  if (!currentTripData) {
+  const { isPlaceSeen, togglePlaceSeen } = useCityProgress();
+  const [index, setIndex] = useState(0);
+  useEffect(() => setIndex(0), [trip.id]);
+  if (!data) return <TripState />;
+  const day = data.itinerary[Math.min(index, data.itinerary.length - 1)];
+  if (!day)
     return (
       <Screen>
-        <View style={[styles.loading, { backgroundColor: t.background }]}>
-          <ActivityIndicator size="large" color={t.accent} />
-          <Text style={[styles.loadingTitle, { color: t.text }]}>Loading itinerary…</Text>
-          <Text style={[styles.loadingSub, { color: t.textSecondary }]}>Building your day-by-day plan from real places.</Text>
-        </View>
+        <Heading>A day to make your own.</Heading>
+        <Body>Visit your Places tab for ideas.</Body>
       </Screen>
     );
-  }
-
-  const data = currentTripData;
-  const day = data.itinerary.find((d) => d.day === currentDay) ?? data.itinerary[0];
-  const totalDays = data.itinerary.length;
-  const dayDate = formatDate(addDays(trip.startDate, currentDay - 1));
-
-  const prev = () => setCurrentDay((d) => Math.max(1, d - 1));
-  const next = () => setCurrentDay((d) => Math.min(totalDays, d + 1));
-
+  const done = day.activities.filter((a) => isDone(a.id)).length;
   return (
     <Screen>
-      <ScreenHeader icon="calendar" title="Itinerary" subtitle={`${trip.destination} · ${range}`} />
-
-      <View style={styles.dayNav}>
-        <Pressable
-          onPress={prev}
-          disabled={currentDay <= 1}
-          style={({ pressed }) => [
-            styles.arrow,
-            {
-              backgroundColor: t.accentSoft,
-              opacity: pressed || currentDay <= 1 ? 0.4 : 1,
-            },
-          ]}>
-          <Ionicons name="chevron-back" size={20} color={t.accent} />
-        </Pressable>
-        <View style={styles.dayInfo}>
-          <Text style={[styles.dayLabel, { color: t.accent }]}>Day {currentDay}</Text>
-          <Text style={[styles.dayDate, { color: t.textSecondary }]}>{dayDate}</Text>
-          <Text style={[styles.dayTitle, { color: t.text }]}>{day.title}</Text>
-        </View>
-        <Pressable
-          onPress={next}
-          disabled={currentDay >= totalDays}
-          style={({ pressed }) => [
-            styles.arrow,
-            {
-              backgroundColor: t.accentSoft,
-              opacity: pressed || currentDay >= totalDays ? 0.4 : 1,
-            },
-          ]}>
-          <Ionicons name="chevron-forward" size={20} color={t.accent} />
-        </Pressable>
+      <View style={{ gap: 8 }}>
+        <Eyebrow>ONE DAY AT A TIME</Eyebrow>
+        <Heading large>A rhythm for your days.</Heading>
+        <Body>A thoughtful plan, with plenty of room to follow your curiosity.</Body>
       </View>
-
-      <RouteMap
-        activities={day.activities}
-        accent={t.accent}
-      />
-
-      {day.activities.map((activity, index) => (
-        <TimelineItem
-          key={activity.id}
-          activity={activity}
-          isFirst={index === 0}
-          isLast={index === day.activities.length - 1}
-          checked={isDone(activity.id)}
-          onToggle={() => toggle(activity.id)}
-        />
-      ))}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 10 }}
+      >
+        {data.itinerary.map((d, i) => (
+          <Pill
+            key={d.day}
+            label={`Day ${d.day} · ${formatDate(addDays(trip.startDate, i))}`}
+            active={index === i}
+            onPress={() => setIndex(i)}
+          />
+        ))}
+      </ScrollView>
+      <View style={{ flexDirection: width > 900 ? 'row' : 'column', gap: 28 }}>
+        <View style={{ flex: 1.3, gap: 22 }}>
+          <View
+            style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+          >
+            <View style={{ gap: 6 }}>
+              <Eyebrow>
+                {formatDate(addDays(trip.startDate, index))} / DAY {day.day}
+              </Eyebrow>
+              <Heading>{day.title}</Heading>
+            </View>
+            <Text style={{ fontSize: 12, color: t.textSecondary }}>
+              {done}/{day.activities.length} done
+            </Text>
+          </View>
+          <ProgressBar value={done / day.activities.length} />
+          {day.activities.map((a, i) => {
+            const checked = isDone(a.id);
+            return (
+              <View key={a.id} style={{ flexDirection: 'row', gap: 16 }}>
+                <View style={{ width: 40, alignItems: 'center', gap: 10 }}>
+                  <Text style={{ fontSize: 11, color: t.textSecondary }}>{a.time}</Text>
+                  <View
+                    style={{
+                      width: 25,
+                      height: 25,
+                      borderRadius: 13,
+                      borderWidth: 1,
+                      borderColor: t.hairline,
+                      backgroundColor: checked ? t.accent : t.card,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{ color: checked ? t.badgeText : t.accent, fontSize: 10 }}>
+                      {i + 1}
+                    </Text>
+                  </View>
+                  {i < day.activities.length - 1 && (
+                    <View style={{ width: 1, flex: 1, backgroundColor: t.hairline }} />
+                  )}
+                </View>
+                <Panel style={{ flex: 1, padding: 20, gap: 12, opacity: checked ? 0.72 : 1 }}>
+                  <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+                    <View style={{ flex: 1, gap: 8 }}>
+                      <Eyebrow>{a.place}</Eyebrow>
+                      <Text
+                        style={{ fontSize: 17, fontWeight: '600', color: t.text, lineHeight: 23 }}
+                      >
+                        {a.title}
+                      </Text>
+                    </View>
+                    <CheckButton
+                      checked={checked}
+                      label={`Complete ${a.title}`}
+                      onToggle={() => {
+                        toggle(a.id);
+                        if (a.placeName && !checked && !isPlaceSeen(data.destination, a.placeName))
+                          togglePlaceSeen(data.destination, a.placeName);
+                      }}
+                    />
+                  </View>
+                  <Text
+                    style={{ fontSize: 12, lineHeight: 20, color: t.textSecondary }}
+                    numberOfLines={3}
+                  >
+                    {a.description}
+                  </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 10, color: t.textSecondary }}>
+                      {a.duration ?? 'Take your time'}
+                    </Text>
+                    {a.url && (
+                      <Pressable onPress={() => Linking.openURL(a.url!).catch(() => {})}>
+                        <Text style={{ color: t.accent, fontSize: 11, fontWeight: '600' }}>
+                          Details & directions ↗
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                </Panel>
+              </View>
+            );
+          })}
+        </View>
+        <View style={{ flex: 1, gap: 18 }}>
+          <RouteMap key={day.day} activities={day.activities} accent={t.accent} height={400} />
+          <Panel style={{ backgroundColor: t.accentSoft, borderColor: t.accentSoft }}>
+            <Ionicons name="walk-outline" size={23} color={t.accent} />
+            <Heading>The in-between matters.</Heading>
+            <Body>
+              Nearby sights are grouped together. Take the detour, find a café, and make this day
+              your own.
+            </Body>
+            <Action
+              label="Open the day’s route"
+              subtle
+              icon="arrow-forward"
+              onPress={() => Linking.openURL(mapsUrl(day.activities)).catch(() => {})}
+            />
+          </Panel>
+          <Body>
+            Checking off a landmark also adds it to your city collection. Unchecking a day’s
+            activity keeps your visited-place history.
+          </Body>
+        </View>
+      </View>
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  dayNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    marginTop: Spacing.xl,
-    marginBottom: Spacing.lg,
-  },
-  arrow: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayInfo: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 2,
-  },
-  dayLabel: {
-    fontSize: FontSize.small,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  dayDate: {
-    fontSize: FontSize.caption,
-    fontWeight: '600',
-  },
-  dayTitle: {
-    fontSize: FontSize.body,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.lg,
-    paddingHorizontal: Spacing.xxl,
-  },
-  loadingTitle: {
-    fontSize: FontSize.label,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  loadingSub: {
-    fontSize: FontSize.small,
-    textAlign: 'center',
-  },
-});

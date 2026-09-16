@@ -1,8 +1,14 @@
-import DateTimePicker, {
-  type DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type TextInputProps,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '@/hooks/use-theme';
@@ -27,7 +33,8 @@ function FieldWrap({ label, icon, error, children }: FieldWrapProps) {
         style={[
           styles.inputWrap,
           { backgroundColor: t.background, borderColor: error ? t.danger : t.hairline },
-        ]}>
+        ]}
+      >
         <Ionicons name={icon} size={18} color={t.icon} />
         {children}
       </View>
@@ -48,6 +55,7 @@ export function TextField({ label, icon, error, style, ...rest }: TextFieldProps
   return (
     <FieldWrap label={label} icon={icon} error={error}>
       <TextInput
+        accessibilityLabel={label}
         placeholderTextColor={t.placeholder}
         style={[styles.input, { color: t.text }, style]}
         {...rest}
@@ -78,7 +86,7 @@ export function DateField({
   const [show, setShow] = useState(false);
 
   const handleChange = (event: DateTimePickerEvent, selected?: Date) => {
-    if (Platform.OS === 'ios') {
+    if (Platform.OS !== 'ios' || event.type === 'set') {
       setShow(false);
     }
     if (event.type === 'set' && selected) {
@@ -90,7 +98,11 @@ export function DateField({
     <View style={styles.wrap}>
       <Text style={[styles.label, { color: t.textSecondary }]}>{label}</Text>
       <Pressable
-        onPress={() => setShow(true)}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityValue={{ text: formatDate(value) }}
+        accessibilityState={{ expanded: show }}
+        onPress={() => setShow((current) => !current)}
         style={({ pressed }) => [
           styles.inputWrap,
           {
@@ -98,7 +110,8 @@ export function DateField({
             borderColor: error ? t.danger : t.hairline,
             opacity: pressed ? 0.7 : 1,
           },
-        ]}>
+        ]}
+      >
         <Ionicons name={icon} size={18} color={t.icon} />
         <Text style={[styles.input, { color: t.text }]}>{formatDate(value)}</Text>
         <Ionicons name="chevron-down" size={16} color={t.icon} />
@@ -127,6 +140,7 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.xs,
   },
   inputWrap: {
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,

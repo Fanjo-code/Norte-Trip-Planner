@@ -35,14 +35,19 @@ function TransportCard({
     <Pressable onPress={() => option.url && Linking.openURL(option.url).catch(() => {})}>
       <Card
         elevated={highlighted}
-        style={[styles.card, highlighted ? { borderColor: t.accent, borderWidth: 1.5 } : undefined]}>
+        style={[styles.card, highlighted ? { borderColor: t.accent, borderWidth: 1.5 } : undefined]}
+      >
         <View style={styles.content}>
           <View style={[styles.iconWrap, { backgroundColor: t.accentSoft }]}>
             <Ionicons name={option.icon} size={24} color={t.accent} />
           </View>
           <View style={styles.info}>
-            <Text style={[styles.name, { color: t.text }]} numberOfLines={1}>{option.name}</Text>
-            <Text style={[styles.desc, { color: t.textSecondary }]} numberOfLines={2}>{option.description}</Text>
+            <Text style={[styles.name, { color: t.text }]} numberOfLines={1}>
+              {option.name}
+            </Text>
+            <Text style={[styles.desc, { color: t.textSecondary }]} numberOfLines={2}>
+              {option.description}
+            </Text>
             <View style={styles.bottomRow}>
               <Text style={[styles.cost, { color: t.accent }]}>{option.cost}</Text>
               <Chip label={option.bestFor} tone="accent" />

@@ -5,19 +5,16 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
 
 import type { UserPreferences } from '@/types/trip';
+import { DEFAULT_PREFS } from '@/lib/preferences';
+export { DEFAULT_PREFS } from '@/lib/preferences';
 
 const PREFS_KEY = 'norte.preferences.v1';
-
-export const DEFAULT_PREFS: UserPreferences = {
-  interests: [],
-  pace: 'balanced',
-  budget: 'standard',
-};
 
 /** Friendly labels for preference values (used by Guide + new-trip chips). */
 export const INTEREST_LABELS: Record<string, string> = {
@@ -55,6 +52,8 @@ const PreferencesContext = createContext<PreferencesContextValue | null>(null);
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefs] = useState<UserPreferences>(DEFAULT_PREFS);
   const [loaded, setLoaded] = useState(false);
+  const changed = useRef(false);
+  const queue = useRef(Promise.resolve());
 
   // Load persisted preferences.
   useEffect(() => {
@@ -62,9 +61,19 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(PREFS_KEY);
-        if (mounted && raw) {
+        if (mounted && raw && !changed.current) {
           const parsed = JSON.parse(raw) as Partial<UserPreferences>;
-          setPrefs({ ...DEFAULT_PREFS, ...parsed });
+          setPrefs({
+            interests: Array.isArray(parsed.interests)
+              ? parsed.interests.filter((i) => typeof i === 'string')
+              : [],
+            pace: ['relaxed', 'balanced', 'packed'].includes(parsed.pace ?? '')
+              ? parsed.pace!
+              : DEFAULT_PREFS.pace,
+            budget: ['budget', 'standard', 'premium'].includes(parsed.budget ?? '')
+              ? parsed.budget!
+              : DEFAULT_PREFS.budget,
+          });
         }
       } catch {
         // ignore — fall back to defaults
@@ -79,19 +88,25 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
   // Persist on change.
   useEffect(() => {
-    if (loaded) AsyncStorage.setItem(PREFS_KEY, JSON.stringify(prefs)).catch(() => {});
+    if (loaded)
+      queue.current = queue.current
+        .then(() => AsyncStorage.setItem(PREFS_KEY, JSON.stringify(prefs)))
+        .catch(() => {});
   }, [prefs, loaded]);
 
   const updatePrefs = useCallback((partial: Partial<UserPreferences>) => {
+    changed.current = true;
     setPrefs((prev) => ({ ...prev, ...partial }));
   }, []);
 
   const hasCustomized =
-    prefs.interests.length > 0 || prefs.pace !== DEFAULT_PREFS.pace || prefs.budget !== DEFAULT_PREFS.budget;
+    prefs.interests.length > 0 ||
+    prefs.pace !== DEFAULT_PREFS.pace ||
+    prefs.budget !== DEFAULT_PREFS.budget;
 
   const value = useMemo<PreferencesContextValue>(
     () => ({ prefs, hasCustomized, updatePrefs }),
-    [prefs, hasCustomized, updatePrefs]
+    [prefs, hasCustomized, updatePrefs],
   );
 
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;

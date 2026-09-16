@@ -1,22 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
-
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTrip } from '@/contexts/trip-context';
-import type { Trip } from '@/types/trip';
-
-const DONE_KEY = 'norte.done.v1';
-
-type DoneMap = Record<string, string[]>;
-
-interface ProgressContextValue {
+interface Value {
   isDone: (id: string) => boolean;
   toggle: (id: string) => void;
   doneCount: number;
@@ -24,108 +9,88 @@ interface ProgressContextValue {
   progress: number;
   tripStreak: number;
   totalCheckOffs: number;
-  getTripDoneCount: (tripId: string) => number;
-  getTripProgress: (tripId: string) => number;
-  getTripStreak: (tripId: string) => number;
+  getTripDoneCount: (id: string) => number;
+  getTripProgress: (id: string) => number;
+  getTripStreak: (id: string) => number;
 }
-
-const ProgressContext = createContext<ProgressContextValue | null>(null);
-
-/** Count total checkable items in a Trip. Returns 0 if no trip data is loaded.
- *  Places are tracked per-city (see city-progress-context), so only itinerary
- *  activities and restaurants count toward the trip's own progress. */
-function countItems(data: Trip | null): number {
-  if (!data) return 0;
-  return (
-    data.itinerary.reduce((n, day) => n + day.activities.length, 0) +
-    data.restaurants.length
-  );
-}
-
-function computeStreak(doneIds: Set<string>, data: Trip | null): number {
-  if (!data) return 0;
-  let streak = 0;
-  for (const day of data.itinerary) {
-    if (day.activities.some((a) => doneIds.has(a.id))) {
-      streak++;
-    } else {
-      break;
-    }
-  }
-  return streak;
-}
-
+const Context = createContext<Value | null>(null);
+const KEY = 'norte.done.v1';
 export function ProgressProvider({ children }: { children: ReactNode }) {
-  const { trip, currentTripData } = useTrip();
-  const [doneMap, setDoneMap] = useState<DoneMap>({});
+  const { trip, currentTripData, trips, isLoading } = useTrip();
+  const [map, setMap] = useState<Record<string, string[]>>({});
   const [loaded, setLoaded] = useState(false);
-
+  const queue = useRef(Promise.resolve());
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(DONE_KEY);
-        if (mounted && raw) setDoneMap(JSON.parse(raw) as DoneMap);
-      } catch {
-        // ignore
-      } finally {
-        if (mounted) setLoaded(true);
-      }
-    })();
-    return () => { mounted = false; };
-  }, []);
-
-  useEffect(() => {
-    if (loaded) AsyncStorage.setItem(DONE_KEY, JSON.stringify(doneMap)).catch(() => {});
-  }, [doneMap, loaded]);
-
-  const toggle = useCallback(
-    (id: string) => {
-      setDoneMap((prev) => {
-        const current = prev[trip.id] ?? [];
-        const next = current.includes(id)
-          ? current.filter((x) => x !== id)
-          : [...current, id];
-        return { ...prev, [trip.id]: next };
+    let active = true;
+    AsyncStorage.getItem(KEY)
+      .then((raw) => {
+        if (active && raw) setMap(JSON.parse(raw));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoaded(true);
       });
-    },
-    [trip.id]
-  );
-
-  const value = useMemo<ProgressContextValue>(() => {
-    const currentDone = doneMap[trip.id] ?? [];
-    const doneSet = new Set(currentDone);
-    const totalItems = countItems(currentTripData);
-    const totalCheckOffs = Object.values(doneMap).reduce((n, ids) => n + ids.length, 0);
-
-    const getTripDoneCount = (tripId: string) => doneMap[tripId]?.length ?? 0;
-    const getTripStreak = (tripId: string) => {
-      // Other trips' full data isn't loaded in memory, so streak is 0.
-      return computeStreak(new Set(doneMap[tripId] ?? []), null);
+    return () => {
+      active = false;
     };
-
-    return {
-      isDone: (id: string) => doneSet.has(id),
-      toggle,
-      doneCount: doneSet.size,
-      totalItems,
-      progress: totalItems === 0 ? 0 : doneSet.size / totalItems,
-      tripStreak: computeStreak(doneSet, currentTripData),
-      totalCheckOffs,
-      getTripDoneCount,
-      getTripProgress: (tripId: string) =>
-        totalItems === 0 ? 0 : getTripDoneCount(tripId) / totalItems,
-      getTripStreak,
-    };
-  }, [doneMap, toggle, trip.id, currentTripData]);
-
-  return <ProgressContext.Provider value={value}>{children}</ProgressContext.Provider>;
-}
-
-export function useProgress() {
-  const ctx = useContext(ProgressContext);
-  if (!ctx) {
-    throw new Error('useProgress must be used within a ProgressProvider');
+  }, []);
+  useEffect(() => {
+    if (loaded && !isLoading)
+      setMap((prev) => {
+        const next = Object.fromEntries(
+          Object.entries(prev).filter(([id]) => trips.some((t) => t.id === id)),
+        );
+        return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+      });
+  }, [trips, loaded, isLoading]);
+  useEffect(() => {
+    if (loaded)
+      queue.current = queue.current
+        .then(() => AsyncStorage.setItem(KEY, JSON.stringify(map)))
+        .catch(() => {});
+  }, [map, loaded]);
+  const all = currentTripData
+    ? [
+        ...currentTripData.itinerary.flatMap((d) => d.activities.map((a) => a.id)),
+        ...currentTripData.restaurants.map((r) => r.id),
+      ]
+    : [];
+  const done = new Set((map[trip.id] ?? []).filter((id) => all.includes(id)));
+  const totalItems = all.length;
+  let streak = 0,
+    best = 0;
+  for (const day of currentTripData?.itinerary ?? []) {
+    streak = day.activities.some((a) => done.has(a.id)) ? streak + 1 : 0;
+    best = Math.max(best, streak);
   }
-  return ctx;
+  const toggle = (id: string) => {
+    if (!loaded || !trip.id) return;
+    setMap((prev) => {
+      const ids = prev[trip.id] ?? [];
+      return { ...prev, [trip.id]: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id] };
+    });
+  };
+  return (
+    <Context.Provider
+      value={{
+        isDone: (id) => done.has(id),
+        toggle,
+        doneCount: done.size,
+        totalItems,
+        progress: totalItems ? done.size / totalItems : 0,
+        tripStreak: best,
+        totalCheckOffs: Object.values(map).reduce((s, a) => s + a.length, 0),
+        getTripDoneCount: (id) => (map[id] ?? []).length,
+        getTripProgress: (id) => (id === trip.id && totalItems ? done.size / totalItems : 0),
+        getTripStreak: (id) => (id === trip.id ? best : 0),
+      }}
+    >
+      {children}
+    </Context.Provider>
+  );
+}
+export function useProgress() {
+  const c = useContext(Context);
+  if (!c) throw new Error('ProgressProvider missing');
+  return c;
 }
