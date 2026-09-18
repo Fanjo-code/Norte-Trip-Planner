@@ -5,6 +5,7 @@ import { Screen } from '@/components/screen';
 import { Body, Eyebrow, Heading, Panel, Pill, ProgressBar, Empty } from '@/components/ui';
 import { CheckButton } from '@/components/check-button';
 import { TripState } from '@/components/trip-state';
+import { PlacesMap } from '@/components/places-map';
 import { useTheme } from '@/hooks/use-theme';
 import { useTrip } from '@/contexts/trip-context';
 import { useCityProgress } from '@/contexts/city-progress-context';
@@ -97,6 +98,24 @@ export default function Places() {
       <Text style={{ fontSize: 11, color: t.textSecondary }}>
         {items.length} places · Sourced from OpenStreetMap
       </Text>
+      <PlacesMap
+        activities={items.slice(0, 30).map((p) => ({
+          id: p.id,
+          title: p.name,
+          place: p.category,
+          lat: p.lat!,
+          lng: p.lng!,
+          time: '',
+          icon: p.icon,
+          description: '',
+          price: p.price,
+          duration: undefined,
+          url: p.url,
+          placeName: p.name,
+        }))}
+        accent={t.accent}
+        height={380}
+      />
       {!items.length && (
         <Empty
           title="Nothing here, just yet."

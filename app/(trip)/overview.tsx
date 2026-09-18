@@ -26,12 +26,7 @@ export default function Guide() {
   const percent = Math.round(getCityProgress(data.destination, data.places) * 100);
   return (
     <Screen>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Eyebrow>YOUR JOURNEY, BEAUTIFULLY UNFOLDED</Eyebrow>
-        <Text style={{ color: t.textSecondary, fontSize: 11 }}>
-          Saved on this device <Ionicons name="checkmark-circle-outline" size={12} />
-        </Text>
-      </View>
+      <Eyebrow>YOUR JOURNEY, BEAUTIFULLY UNFOLDED</Eyebrow>
       <Hero
         title={trip.destination}
         subtitle={`${formatDateRange(trip.startDate, trip.endDate)}  ·  ${daysBetween(trip.startDate, trip.endDate)} days to explore`}

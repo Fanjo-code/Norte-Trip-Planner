@@ -8,6 +8,8 @@ Norte is an Expo React Native city-exploration app, with an iPhone target and a 
 
 The design uses warm ivory, deep olive, editorial serif headings, and restrained cards. Both light and dark modes are supported. Keep product copy plain, approachable, and free of implementation jargon.
 
+Food screen uses visual category cards with Unsplash imagery for Breakfast, Meals (lunch/dinner), and Drinks. Itinerary shows map above activities with simplified cards (title, time, directions only). Places screen shows map with icon pins, no route lines or numbering. Bottom tab bar is compact and tight to the screen bottom on mobile.
+
 ## Architecture
 
 - Expo Router root stack: index, new-trip, preferences, (trip).
@@ -15,9 +17,11 @@ The design uses warm ivory, deep olive, editorial serif headings, and restrained
 - Providers: Appearance → navigation theme → Trip → Preferences → CityProgress → Progress.
 - Shared components in components/ui.tsx and components/screen.tsx.
 - Platform files: field.web.tsx uses a browser date input; route-map.web.tsx loads Leaflet in a browser-only effect with normal tile referrers. Native variants use date-time picker and react-native-maps.
+- Map components: RouteMap (itinerary with lines and numbers), PlacesMap (places with pins only, no route lines).
 - services/travel.ts fetches live data. lib/itinerary.ts is deterministic and independently testable.
 - services/ai.ts calls the local server only. server/lib/ai.mjs can refine writing but must preserve all verified identities and structural data.
 - server/lib/http.mjs supplies bounded fetches, request deduplication, and timestamped disk caching.
+- server/lib/overpass.mjs uses multiple Overpass API endpoints with fallback. server/lib/fallback-restaurants.mjs provides backup data when APIs fail.
 - API routes: /health, /api/geocode, /api/reverse-geocode, /api/places, /api/restaurants, /api/transport, /api/weather, POST /api/ai-plan.
 
 ## Persistence
@@ -35,7 +39,7 @@ Preserve older data where possible. Persist writes in order and guard asynchrono
 ## Planning rules
 
 - Live planning works without credentials; AI editing is explicitly optional.
-- Landmark fetch failure gives a retryable error. Dining and transit outages are nonfatal.
+- Landmark fetch failure gives a retryable error. Dining and transit outages are nonfatal and fall back to static data.
 - No weather request should block trip creation.
 - Pace: 2 / 3 / 5 sights per day for relaxed / balanced / packed.
 - Places remain comprehensive regardless of interests; interests affect itinerary selection.
@@ -43,6 +47,7 @@ Preserve older data where possible. Persist writes in order and guard asynchrono
 - Flexible dates are an explicitly displayed scheduling suggestion, not a claim about cheapest dates or crowds.
 - Use local calendar dates, not UTC date slicing, for saved travel dates.
 - Preserve first and last stops in external map directions. Drawn map lines are visit order only.
+- Restaurant categories: Breakfast (cafes), Meals (lunch & dinner combined), Drinks (bars). Same restaurants serve lunch and dinner.
 
 ## Credentials
 

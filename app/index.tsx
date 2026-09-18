@@ -32,6 +32,7 @@ export default function Home() {
   const { trips, selectTrip, deleteTrip, isLoading, storageError } = useTrip();
   const { getCityRecord } = useCityProgress();
   const [query, setQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
   const [remove, setRemove] = useState<string | null>(null);
   const plan = (city: string) =>
     router.push({ pathname: '/new-trip', params: { destination: city } });
@@ -191,24 +192,46 @@ export default function Home() {
           </Heading>
         </View>
         {trips.length > 0 && (
-          <TextInput
+          <Pressable
+            onPress={() => setShowSearch(true)}
             accessibilityLabel="Search saved journeys"
-            placeholder="Search journeys…"
-            value={query}
-            onChangeText={setQuery}
-            placeholderTextColor={t.placeholder}
             style={{
               backgroundColor: t.card,
               borderWidth: 1,
               borderColor: t.hairline,
               borderRadius: 8,
               padding: 12,
-              color: t.text,
-              width: wide ? 210 : 140,
+              minWidth: 44,
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
-          />
+          >
+            <Ionicons name="search-outline" size={18} color={t.icon} />
+          </Pressable>
         )}
       </View>
+      {showSearch && trips.length > 0 && (
+        <TextInput
+          accessibilityLabel="Search saved journeys"
+          placeholder="Search journeys…"
+          value={query}
+          onChangeText={setQuery}
+          placeholderTextColor={t.placeholder}
+          autoFocus
+          onBlur={() => {
+            if (!query) setShowSearch(false);
+          }}
+          style={{
+            backgroundColor: t.card,
+            borderWidth: 1,
+            borderColor: t.hairline,
+            borderRadius: 8,
+            padding: 12,
+            color: t.text,
+            fontSize: 14,
+          }}
+        />
+      )}
       {isLoading ? (
         <ActivityIndicator color={t.accent} />
       ) : trips.length === 0 ? (

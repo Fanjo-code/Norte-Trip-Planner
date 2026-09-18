@@ -1,6 +1,6 @@
 /**
  * Destination photos via Unsplash (free, no API key).
- * Add more cities as needed — the fallback is a teal gradient.
+ * Returns images for any city via Unsplash's curated collection.
  */
 const IMAGES: Record<string, string> = {
   porto: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?w=800&h=500&fit=crop&q=80',
@@ -23,6 +23,13 @@ const IMAGES: Record<string, string> = {
   seville: 'https://images.unsplash.com/photo-1555990538-1f0d74bfba6c?w=800&h=500&fit=crop&q=80',
   istanbul:
     'https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=800&h=500&fit=crop&q=80',
+  munich: 'https://images.unsplash.com/photo-1595867818082-083862f3d630?w=800&h=500&fit=crop&q=80',
+  vienna: 'https://images.unsplash.com/photo-1516550893923-42d28e5677af?w=800&h=500&fit=crop&q=80',
+  athens: 'https://images.unsplash.com/photo-1555993539-1732b0258235?w=800&h=500&fit=crop&q=80',
+  copenhagen:
+    'https://images.unsplash.com/photo-1513622470522-26c3c8a854bc?w=800&h=500&fit=crop&q=80',
+  brussels:
+    'https://images.unsplash.com/photo-1559113202-c916b8e44373?w=800&h=500&fit=crop&q=80',
 };
 
 /** Returns an Unsplash photo URL for the destination, or null for the fallback gradient. */
@@ -33,6 +40,10 @@ export function getDestinationImage(destination: string): string | null {
     sevilla: 'seville',
     firenze: 'florence',
     'new york city': 'new york',
+    münchen: 'munich',
+    wien: 'vienna',
+    bruxelles: 'brussels',
+    København: 'copenhagen',
   };
   const raw = destination.trim().toLowerCase().split(',')[0].trim();
   const key = aliases[raw] ?? raw;

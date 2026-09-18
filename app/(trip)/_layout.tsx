@@ -22,10 +22,11 @@ export default function Layout() {
         <View
           style={{
             backgroundColor: t.background,
-            borderBottomWidth: 1,
-            borderColor: t.hairline,
-            paddingHorizontal: width > 900 ? 48 : 12,
-            paddingBottom: width <= 700 ? insets.bottom : 0,
+            borderTopWidth: 1,
+            borderTopColor: t.hairline,
+            paddingHorizontal: width > 900 ? 48 : 16,
+            paddingBottom: width <= 700 ? Math.max(4, insets.bottom - 8) : 0,
+            paddingTop: width <= 700 ? 4 : 0,
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -67,24 +68,24 @@ export default function Layout() {
                     if (!e.defaultPrevented) navigation.navigate(route.name);
                   }}
                   style={{
-                    paddingVertical: width > 700 ? 18 : 10,
+                    paddingVertical: width > 700 ? 18 : 8,
                     minWidth: 44,
                     flex: width <= 700 ? 1 : undefined,
                     borderBottomWidth: 2,
                     borderColor: active ? t.accent : 'transparent',
                     flexDirection: width > 700 ? 'row' : 'column',
                     alignItems: 'center',
-                    gap: 7,
+                    gap: 4,
                   }}
                 >
                   <Ionicons
                     name={l.icon}
-                    size={width > 700 ? 17 : 22}
+                    size={width > 700 ? 17 : 20}
                     color={active ? t.accent : t.textSecondary}
                   />
                   <Text
                     style={{
-                      fontSize: width > 700 ? 12 : 10,
+                      fontSize: width > 700 ? 12 : 9,
                       fontWeight: active ? '700' : '400',
                       color: active ? t.accent : t.textSecondary,
                       textAlign: 'center',

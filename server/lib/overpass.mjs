@@ -1,7 +1,10 @@
 import { cached, fetchJson } from './http.mjs';
+import { getFallbackRestaurants } from './fallback-restaurants.mjs';
+
 const endpoints = [
-  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
 ];
 async function run(query) {
   return cached('osm:' + query, 86400000, async () => {
@@ -78,17 +81,35 @@ export async function getRestaurants(lat, lng, radius = 3000) {
   ]
     .map((n) => n.toFixed(4))
     .join(',');
-  const result = unique(
-    await run(
-      `[out:json][timeout:12];node["amenity"~"^(restaurant|cafe|bar|pub)$"]["name"](${bounds});out 300;`,
-    ),
-    'restaurant',
-  ).filter(
-    (p) =>
-      !/mcdonald|burger king|starbucks|kfc|subway|domino|pizza hut/i.test(
-        p.name + ' ' + (p.tags.brand ?? ''),
+
+  try {
+    const result = unique(
+      await run(
+        `[out:json][timeout:12];node["amenity"~"^(restaurant|cafe|bar|pub)$"]["name"](${bounds});out 300;`,
       ),
-  );
+      'restaurant',
+    ).filter(
+      (p) =>
+        !/mcdonald|burger king|starbucks|kfc|subway|domino|pizza hut/i.test(
+          p.name + ' ' + (p.tags.brand ?? ''),
+        ),
+    );
+
+    if (result.length === 0) {
+      console.log('[overpass] No restaurants from API, using fallback data');
+      const fallback = getFallbackRestaurants('munich', lat, lng);
+      return pickRestaurants(fallback.map((f) => normalize(f, 'restaurant')));
+    }
+
+    return pickRestaurants(result);
+  } catch (error) {
+    console.log('[overpass] API error, using fallback data:', error.message);
+    const fallback = getFallbackRestaurants('munich', lat, lng);
+    return pickRestaurants(fallback.map((f) => normalize(f, 'restaurant')));
+  }
+}
+
+function pickRestaurants(result) {
   const score = (p) =>
     (p.tags.website ? 10 : 0) + (p.tags.cuisine ? 10 : 0) + (p.tags.opening_hours ? 5 : 0);
   const pick = (type, count) =>

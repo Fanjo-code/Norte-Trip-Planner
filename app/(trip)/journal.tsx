@@ -227,7 +227,7 @@ export default function Journal() {
             }}
           >
             “Not all those who wander are lost.”
-            <Text style={{ fontFamily: Fonts.sans, fontSize: 10 }}>\nJ. R. R. TOLKIEN</Text>
+            <Text style={{ fontFamily: Fonts.sans, fontSize: 10 }}>{'\n'}J. R. R. TOLKIEN</Text>
           </Text>
         </View>
       </View>

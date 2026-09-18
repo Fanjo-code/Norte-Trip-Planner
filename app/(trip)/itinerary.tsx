@@ -67,6 +67,7 @@ export default function Itinerary() {
             </Text>
           </View>
           <ProgressBar value={done / day.activities.length} />
+          <RouteMap key={day.day} activities={day.activities} accent={t.accent} height={320} />
           {day.activities.map((a, i) => {
             const checked = isDone(a.id);
             return (
@@ -96,12 +97,12 @@ export default function Itinerary() {
                 <Panel style={{ flex: 1, padding: 20, gap: 12, opacity: checked ? 0.72 : 1 }}>
                   <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
                     <View style={{ flex: 1, gap: 8 }}>
-                      <Eyebrow>{a.place}</Eyebrow>
                       <Text
                         style={{ fontSize: 17, fontWeight: '600', color: t.text, lineHeight: 23 }}
                       >
                         {a.title}
                       </Text>
+                      <Eyebrow>{a.place}</Eyebrow>
                     </View>
                     <CheckButton
                       checked={checked}
@@ -113,20 +114,14 @@ export default function Itinerary() {
                       }}
                     />
                   </View>
-                  <Text
-                    style={{ fontSize: 12, lineHeight: 20, color: t.textSecondary }}
-                    numberOfLines={3}
-                  >
-                    {a.description}
-                  </Text>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 10, color: t.textSecondary }}>
+                    <Text style={{ fontSize: 11, color: t.textSecondary }}>
                       {a.duration ?? 'Take your time'}
                     </Text>
                     {a.url && (
                       <Pressable onPress={() => Linking.openURL(a.url!).catch(() => {})}>
                         <Text style={{ color: t.accent, fontSize: 11, fontWeight: '600' }}>
-                          Details & directions ↗
+                          Directions ↗
                         </Text>
                       </Pressable>
                     )}
@@ -137,7 +132,6 @@ export default function Itinerary() {
           })}
         </View>
         <View style={{ flex: 1, gap: 18 }}>
-          <RouteMap key={day.day} activities={day.activities} accent={t.accent} height={400} />
           <Panel style={{ backgroundColor: t.accentSoft, borderColor: t.accentSoft }}>
             <Ionicons name="walk-outline" size={23} color={t.accent} />
             <Heading>The in-between matters.</Heading>
