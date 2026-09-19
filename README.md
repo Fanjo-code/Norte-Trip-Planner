@@ -27,18 +27,17 @@ For a phone, copy `.env.example` to `.env`, set `EXPO_PUBLIC_PROXY_URL` to your 
 - Create exact-date journeys, or review a suggested Tuesday-start window within a flexible month. Trips support 1–30 days. Flexible dates are a scheduling suggestion, not a price or crowd forecast.
 - Save and reopen complete journeys on your device.
 - Set interests, pace, and dining style for future trips.
-- Explore up to 50 real, deduplicated city landmarks with search, category filters, and visited filters.
-- Follow day plans that group nearby sights. Dining suggestions continue across longer trips.
-- Use interactive maps on web and native; open correctly ordered walking directions in Google Maps. Map lines indicate visit order, not a calculated walking path.
-- Discover local cafés, restaurants, and bars; check off the tables you try.
-- Keep city visits across journeys, capped at 100% completion.
+- Explore real, deduplicated city landmarks with search, category filters, and visited filters. Places include an interactive map showing all points of interest.
+- Follow day plans that group nearby sights, with maps displayed prominently at the top of each day. Dining suggestions continue across longer trips.
+- Discover local cafés, restaurants, and bars organized into three clear categories: Breakfast (cafés), Meals (lunch & dinner combined), and One more glass (bars).
+- Tighter, more compact mobile navigation with a refined tab bar sitting close to the bottom of the screen.
 - Collect completed activities and places in a journal, with saved private notes.
 - Switch between light and dark themes.
 - Cancel planning, retry failures, and recover from trips without saved data.
 
 ## Data and accuracy
 
-The local server uses Nominatim for city lookup and Overpass/OpenStreetMap for places, dining, and transit. It caches real responses, deduplicates requests, uses bounded timeouts, and has an alternate Overpass endpoint. Saved trip content is readable without a data connection; remote photographs and map tiles still require internet.
+The local server uses Nominatim for city lookup and OpenStreetMap for places, dining, and transit. It uses multiple Overpass API endpoints with automatic failover and includes a static fallback dataset for major cities to ensure dining options are always available. It caches real responses, deduplicates requests, uses bounded timeouts. Saved trip content is readable without a data connection; remote photographs and map tiles still require internet.
 
 Unknown ratings and admission prices stay unknown. Opening hours are shown only when the source includes them. Suggested visit durations are explicitly approximate. The app does not make bookings or check real-time business availability.
 
