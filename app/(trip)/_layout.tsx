@@ -25,8 +25,8 @@ export default function Layout() {
             borderTopWidth: 1,
             borderTopColor: t.hairline,
             paddingHorizontal: width > 900 ? 48 : 16,
-            paddingBottom: width <= 700 ? Math.max(4, insets.bottom - 8) : 0,
-            paddingTop: width <= 700 ? 4 : 0,
+            paddingBottom: width <= 700 ? Math.max(2, insets.bottom - 12) : 0,
+            paddingTop: width <= 700 ? 2 : 0,
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -46,7 +46,7 @@ export default function Layout() {
               flexDirection: 'row',
               flex: width > 900 ? undefined : 1,
               justifyContent: 'space-around',
-              gap: width > 900 ? 32 : 0,
+              gap: width > 900 ? 16 : 0,
             }}
           >
             {state.routes.map((route, index) => {
@@ -68,14 +68,14 @@ export default function Layout() {
                     if (!e.defaultPrevented) navigation.navigate(route.name);
                   }}
                   style={{
-                    paddingVertical: width > 700 ? 18 : 8,
+                    paddingVertical: width > 700 ? 10 : 4,
                     minWidth: 44,
                     flex: width <= 700 ? 1 : undefined,
                     borderBottomWidth: 2,
                     borderColor: active ? t.accent : 'transparent',
                     flexDirection: width > 700 ? 'row' : 'column',
                     alignItems: 'center',
-                    gap: 4,
+                    gap: 2,
                   }}
                 >
                   <Ionicons

@@ -46,7 +46,7 @@ export const Fonts = {
     Platform.OS === 'web'
       ? 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
       : 'System',
-  serif: Platform.OS === 'ios' ? 'Georgia' : Platform.OS === 'web' ? 'Georgia, serif' : 'serif',
+  serif: Platform.OS === 'ios' ? 'Georgia' : Platform.OS === 'web' ? 'Georgia, "Playfair Display", serif' : 'Georgia, serif',
   rounded: 'System',
   mono: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
 };

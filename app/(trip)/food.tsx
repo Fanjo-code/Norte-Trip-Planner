@@ -18,9 +18,9 @@ import { useTrip } from '@/contexts/trip-context';
 import { useProgress } from '@/contexts/progress-context';
 
 const MEAL_IMAGES = {
-  Breakfast: 'https://images.unsplash.com/photo-1533777857889-4be7c70b33f7?w=400&h=300&fit=crop',
-  Meals: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop',
-  Drinks: 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=400&h=300&fit=crop',
+  Breakfast: 'https://images.unsplash.com/photo-1528699633788-424224dc89b5?w=800&h=600&fit=crop&q=80',
+  Meals: 'https://images.unsplash.com/photo-1542276867-c7f5032e1835?w=800&h=600&fit=crop&q=80',
+  Drinks: 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=800&h=600&fit=crop&q=80',
 };
 
 export default function Food() {
@@ -111,7 +111,7 @@ export default function Food() {
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <Ionicons name={cat.icon} size={20} color="#FFFFFF" />
-                        <Text style={{ fontSize: 18, fontWeight: '700', color: '#FFFFFF' }}>
+                        <Text style={{ fontSize: 20, fontWeight: '700', color: '#FFFFFF', letterSpacing: -0.5, fontFamily: 'Georgia' }}>
                           {cat.label}
                         </Text>
                       </View>
