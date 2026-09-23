@@ -19,7 +19,7 @@ import { useProgress } from '@/contexts/progress-context';
 
 const MEAL_IMAGES = {
   Breakfast: 'https://images.unsplash.com/photo-1528699633788-424224dc89b5?w=800&h=600&fit=crop&q=80',
-  Meals: 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&h=600&fit=crop&q=80',
+  Meals: 'https://images.unsplash.com/photo-1600891964092-4316c288032e?w=800&h=600&fit=crop&q=80',
   Drinks: 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=800&h=600&fit=crop&q=80',
 };
 
@@ -35,7 +35,7 @@ export default function Food() {
   const mealCategories = [
     { key: 'Breakfast', label: 'Morning coffee', icon: 'cafe-outline' as const },
     { key: 'Meals', label: 'Lunch & dinner', icon: 'restaurant-outline' as const },
-    { key: 'Drinks', label: 'Drinks', icon: 'wine-outline' as const },
+    { key: 'Drinks', label: 'Nightcap', icon: 'wine-outline' as const },
   ];
 
   const mealMap: Record<string, string[]> = {
