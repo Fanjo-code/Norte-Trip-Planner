@@ -1,5 +1,5 @@
 import type { Trip, UserPreferences } from '@/types/trip';
-const BASE = process.env.EXPO_PUBLIC_PROXY_URL ?? 'http://localhost:8787';
+const BASE = process.env.EXPO_PUBLIC_GROQ_URL ?? 'https://api.groq.com/openai/v1';
 export async function isAiAvailable(): Promise<boolean> {
   try {
     const controller = new AbortController();
@@ -23,7 +23,7 @@ export async function enrichTrip(
   const abort = () => controller.abort();
   signal?.addEventListener('abort', abort, { once: true });
   if (signal?.aborted) controller.abort();
-  const timer = setTimeout(abort, 30000);
+  const timer = setTimeout(abort, 60000);
   try {
     const response = await fetch(BASE + '/api/ai-plan', {
       method: 'POST',
