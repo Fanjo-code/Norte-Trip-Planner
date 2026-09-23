@@ -1,0 +1,33 @@
+npm notice run norte-trip-planner@1.0.0 npx
+npm notice run expo start -p 8088 --non-interactive
+  --non-interactive is not supported, use $CI=1 instead
+env: load .env
+env: export EXPO_PUBLIC_PROXY_URL GROQ_API_KEY GROQ_MODEL OMNIROUTE_API_KEY OMNIROUTE_BASE_URL OMNIROUTE_MODEL PROXY_PORT
+Starting project at C:\Users\franc\Desktop\Norte Trip Planner
+› Port 8088 is being used by another process
+Input is required, but 'npx expo' is in non-interactive mode.
+Required input:
+> Use port 8089 instead?
+› Skipping dev server
+npm notice run norte-trip-planner@1.0.0 npx
+npm notice run expo start -p 8089 --non-interactive
+  --non-interactive is not supported, use $CI=1 instead
+env: load .env
+env: export EXPO_PUBLIC_PROXY_URL GROQ_API_KEY GROQ_MODEL OMNIROUTE_API_KEY OMNIROUTE_BASE_URL OMNIROUTE_MODEL PROXY_PORT
+Starting project at C:\Users\franc\Desktop\Norte Trip Planner
+› Port 8089 is being used by another process
+Input is required, but 'npx expo' is in non-interactive mode.
+Required input:
+> Use port 8091 instead?
+› Skipping dev server
+npm notice run norte-trip-planner@1.0.0 npx
+npm notice run expo start -p 8090 --non-interactive
+  --non-interactive is not supported, use $CI=1 instead
+env: load .env
+env: export EXPO_PUBLIC_PROXY_URL GROQ_API_KEY GROQ_MODEL OMNIROUTE_API_KEY OMNIROUTE_BASE_URL OMNIROUTE_MODEL PROXY_PORT
+Starting project at C:\Users\franc\Desktop\Norte Trip Planner
+› Port 8090 is being used by another process
+Input is required, but 'npx expo' is in non-interactive mode.
+Required input:
+> Use port 8091 instead?
+› Skipping dev server

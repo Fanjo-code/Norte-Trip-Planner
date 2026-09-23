@@ -126,11 +126,7 @@ export default function Food() {
           </View>
 
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <Pill
-              label="All tables"
-              active={selected === null}
-              onPress={() => setSelected(null)}
-            />
+            <Pill label="All tables" active={selected === null} onPress={() => setSelected(null)} />
             <Pill
               label="Tried & loved"
               active={selected === 'Tried & loved'}
