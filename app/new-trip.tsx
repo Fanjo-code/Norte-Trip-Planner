@@ -118,7 +118,9 @@ export default function NewTrip() {
     } catch (e) {
       if (!controller.signal.aborted)
         setError(
-          e instanceof Error && e.name !== 'AbortError'
+          e instanceof Error &&
+            e.name !== 'AbortError' &&
+            e.name !== 'FetchRequestCanceledException'
             ? e.message
             : 'The city service took too long to respond. Please try again.',
         );

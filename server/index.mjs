@@ -97,7 +97,9 @@ const server = http.createServer(async (req, res) => {
         reply(res, 200, { places: await getPlaces(lat, lng, radius) });
         break;
       case '/api/restaurants':
-        reply(res, 200, { restaurants: await getRestaurants(lat, lng, radius) });
+        reply(res, 200, {
+          restaurants: await getRestaurants(lat, lng, radius, q.get('city') ?? 'porto'),
+        });
         break;
       case '/api/transport':
         reply(res, 200, await getTransport(lat, lng, radius));

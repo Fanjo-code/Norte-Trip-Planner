@@ -11,6 +11,7 @@ import {
 } from 'react';
 import type { SavedTrip, Trip } from '@/types/trip';
 import { addDays, localISO, parseDate } from '@/lib/format';
+import { scheduleTripNotifications } from '@/services/notifications';
 export const TRIPS_KEY = 'norte.trips.v1';
 const DATA_PREFIX = 'norte.tripdata.v1:';
 const SELECTED_KEY = 'norte.selected.v1';
@@ -176,6 +177,19 @@ export function TripProvider({ children }: { children: ReactNode }) {
           },
     [selected],
   );
+  useEffect(() => {
+    if (!loaded) return;
+
+    const now = new Date();
+    const isDuringTrip = trip.id !== '' && trip.startDate <= now && trip.endDate >= now;
+
+    // For re-engagement, if no active trip or trip is over,
+    // pass a value that triggers the 7-day reminder
+    const daysUntilNext = trip.id === '' || trip.endDate < now ? 30 : 0;
+
+    scheduleTripNotifications(trip.id !== '' ? trip : null, isDuringTrip, daysUntilNext);
+  }, [loaded, trip]);
+
   return (
     <Context.Provider
       value={{

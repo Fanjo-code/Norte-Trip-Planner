@@ -9,8 +9,16 @@ import { TripProvider } from '@/contexts/trip-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppShell } from '@/components/app-shell';
 import Head from 'expo-router/head';
+import { useEffect } from 'react';
+import { requestNotificationPermissions } from '@/services/notifications';
+
 function NavigationRoot() {
   const scheme = useColorScheme();
+
+  useEffect(() => {
+    requestNotificationPermissions();
+  }, []);
+
   return (
     <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Head>

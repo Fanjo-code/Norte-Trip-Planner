@@ -51,6 +51,15 @@ export async function proxyFetch<T>(
       );
     }
     return await res.json();
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') throw e;
+    if (
+      (e as Error).name === 'FetchRequestCanceledException' ||
+      (e as Error).message?.startsWith('Fetch request has been canceled')
+    ) {
+      throw new DOMException('Cancelled', 'AbortError');
+    }
+    throw e;
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener('abort', abort);

@@ -28,8 +28,7 @@ const IMAGES: Record<string, string> = {
   athens: 'https://images.unsplash.com/photo-1555993539-1732b0258235?w=800&h=500&fit=crop&q=80',
   copenhagen:
     'https://images.unsplash.com/photo-1513622470522-26c3c8a854bc?w=800&h=500&fit=crop&q=80',
-  brussels:
-    'https://images.unsplash.com/photo-1559113202-c916b8e44373?w=800&h=500&fit=crop&q=80',
+  brussels: 'https://images.unsplash.com/photo-1559113202-c916b8e44373?w=800&h=500&fit=crop&q=80',
 };
 
 /** Returns an Unsplash photo URL for the destination, or null for the fallback gradient. */
@@ -47,5 +46,6 @@ export function getDestinationImage(destination: string): string | null {
   };
   const raw = destination.trim().toLowerCase().split(',')[0].trim();
   const key = aliases[raw] ?? raw;
-  return IMAGES[key] ?? null;
+  if (IMAGES[key]) return IMAGES[key];
+  return `https://source.unsplash.com/800x500/?${encodeURIComponent(raw)}`;
 }

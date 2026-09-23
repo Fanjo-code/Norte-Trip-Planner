@@ -4,14 +4,14 @@
  */
 
 export const FALLBACK_RESTAURANTS = {
-  munich: [
+  default: [
     {
       id: 'fallback-munich-cafe-1',
       name: 'Cafe Frischhut',
       amenity: 'cafe',
       cuisine: 'coffee_shop',
       lat: 48.1351,
-      lng: 11.5820,
+      lng: 11.582,
     },
     {
       id: 'fallback-munich-cafe-2',
@@ -82,7 +82,7 @@ export const FALLBACK_RESTAURANTS = {
       name: 'Schumann Bar',
       amenity: 'bar',
       cuisine: 'cocktails',
-      lat: 48.1390,
+      lat: 48.139,
       lng: 11.5775,
     },
     {
@@ -91,14 +91,14 @@ export const FALLBACK_RESTAURANTS = {
       amenity: 'bar',
       cuisine: 'cocktails',
       lat: 48.1395,
-      lng: 11.5820,
+      lng: 11.582,
     },
   ],
 };
 
 export function getFallbackRestaurants(cityName, lat, lng) {
   const normalized = cityName.toLowerCase().replace(/[^a-z]/g, '');
-  const cityData = FALLBACK_RESTAURANTS[normalized] || [];
+  const cityData = FALLBACK_RESTAURANTS[normalized] || FALLBACK_RESTAURANTS.default || [];
 
   // Add default coordinates and tags to match expected structure
   return cityData.map((r) => ({

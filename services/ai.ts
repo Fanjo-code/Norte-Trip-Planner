@@ -34,6 +34,15 @@ export async function enrichTrip(
     const body = await response.json();
     if (!response.ok) throw new Error(body.error ?? 'AI enrichment is unavailable.');
     return body.trip;
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') throw e;
+    if (
+      (e as Error).name === 'FetchRequestCanceledException' ||
+      (e as Error).message?.startsWith('Fetch request has been canceled')
+    ) {
+      throw new DOMException('Cancelled', 'AbortError');
+    }
+    throw e;
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener('abort', abort);
