@@ -9,12 +9,18 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { SavedTrip, Trip } from '@/types/trip';
+import type { PlanningStageName, SavedTrip, Trip, UserPreferences } from '@/types/trip';
 import { addDays, localISO, parseDate } from '@/lib/format';
+import { buildItineraryFromSelection } from '@/lib/itinerary';
+import { interruptRunningStages, mergePlanningStage } from '@/lib/planning-state';
+import { fetchRestaurants, fetchTransport, ProxyError, stage } from '@/services/travel';
+import { requestAiSuggestion } from '@/services/ai';
 import { scheduleTripNotifications } from '@/services/notifications';
+
 export const TRIPS_KEY = 'norte.trips.v1';
 const DATA_PREFIX = 'norte.tripdata.v1:';
 const SELECTED_KEY = 'norte.selected.v1';
+
 export interface TripState {
   id: string;
   destination: string;
@@ -31,18 +37,29 @@ interface Value {
   addTrip: (input: { destination: string; startDate: Date; endDate: Date }, data?: Trip) => string;
   selectTrip: (id: string) => void;
   setTripData: (id: string, data: Trip) => void;
-  setGenerating: (v: boolean) => void;
+  setGenerating: (value: boolean) => void;
   deleteTrip: (id: string) => void;
+  beginEnrichment: (id: string, prefs: UserPreferences) => void;
+  retryPlanningStage: (id: string, name: PlanningStageName, prefs: UserPreferences) => void;
+  applyAiSuggestion: (id: string) => void;
+  dismissAiSuggestion: (id: string) => void;
 }
+
 const Context = createContext<Value | null>(null);
+
 export function TripProvider({ children }: { children: ReactNode }) {
   const [trips, setTrips] = useState<SavedTrip[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [dataMap, setDataMap] = useState<Record<string, Trip>>({});
+  const dataRef = useRef<Record<string, Trip>>({});
+  const controllers = useRef<Record<string, Partial<Record<PlanningStageName, AbortController>>>>(
+    {},
+  );
   const [loaded, setLoaded] = useState(false);
   const [isGenerating, setGenerating] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
   const queue = useRef(Promise.resolve());
+
   const persist = useCallback((job: () => Promise<void>) => {
     queue.current = queue.current
       .then(job)
@@ -52,6 +69,25 @@ export function TripProvider({ children }: { children: ReactNode }) {
         ),
       );
   }, []);
+
+  const replaceMap = useCallback((map: Record<string, Trip>) => {
+    dataRef.current = map;
+    setDataMap(map);
+  }, []);
+
+  const updateTrip = useCallback(
+    (id: string, updater: (current: Trip) => Trip) => {
+      const current = dataRef.current[id];
+      if (!current) return;
+      const next = updater(current);
+      const map = { ...dataRef.current, [id]: next };
+      dataRef.current = map;
+      setDataMap(map);
+      persist(() => AsyncStorage.setItem(DATA_PREFIX + id, JSON.stringify(next)));
+    },
+    [persist],
+  );
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -60,35 +96,40 @@ export function TripProvider({ children }: { children: ReactNode }) {
         const parsed: SavedTrip[] = raw ? JSON.parse(raw) : [];
         const valid = Array.isArray(parsed)
           ? parsed.filter(
-              (x) =>
-                x &&
-                x.id &&
-                x.destination &&
-                Number.isFinite(new Date(x.startDateISO).getTime()) &&
-                Number.isFinite(new Date(x.endDateISO).getTime()),
+              (item) =>
+                item?.id &&
+                item.destination &&
+                Number.isFinite(new Date(item.startDateISO).getTime()) &&
+                Number.isFinite(new Date(item.endDateISO).getTime()),
             )
           : [];
-        const pairs = await AsyncStorage.multiGet(valid.map((x) => DATA_PREFIX + x.id));
+        const pairs = await AsyncStorage.multiGet(valid.map((item) => DATA_PREFIX + item.id));
         const map: Record<string, Trip> = {};
-        for (const [key, val] of pairs) {
+        const interruptedWrites: [string, string][] = [];
+        for (const [key, value] of pairs) {
           try {
-            const d = val ? JSON.parse(val) : null;
+            const data = value ? JSON.parse(value) : null;
             if (
-              d &&
-              Array.isArray(d.places) &&
-              Array.isArray(d.itinerary) &&
-              Array.isArray(d.restaurants) &&
-              Array.isArray(d.transport)
-            )
-              map[key.slice(DATA_PREFIX.length)] = d;
+              data &&
+              Array.isArray(data.places) &&
+              Array.isArray(data.itinerary) &&
+              Array.isArray(data.restaurants) &&
+              Array.isArray(data.transport)
+            ) {
+              const normalized = interruptRunningStages(data);
+              const id = key.slice(DATA_PREFIX.length);
+              map[id] = normalized;
+              if (normalized !== data) interruptedWrites.push([key, JSON.stringify(normalized)]);
+            }
           } catch {}
         }
+        if (interruptedWrites.length) await AsyncStorage.multiSet(interruptedWrites);
         const selectedId = await AsyncStorage.getItem(SELECTED_KEY);
         if (active) {
           setTrips(valid);
-          setDataMap(map);
+          replaceMap(map);
           setCurrentId(
-            valid.some((t) => t.id === selectedId) ? selectedId : (valid[0]?.id ?? null),
+            valid.some((item) => item.id === selectedId) ? selectedId : (valid[0]?.id ?? null),
           );
         }
       } catch {
@@ -103,7 +144,8 @@ export function TripProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [replaceMap]);
+
   const addTrip = useCallback(
     (input: { destination: string; startDate: Date; endDate: Date }, data?: Trip) => {
       const id = 'trip-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
@@ -113,53 +155,183 @@ export function TripProvider({ children }: { children: ReactNode }) {
         startDateISO: localISO(input.startDate),
         endDateISO: localISO(input.endDate),
       };
-      setTrips((prev) => [saved, ...prev]);
+      setTrips((previous) => [saved, ...previous]);
       setCurrentId(id);
-      if (data) setDataMap((prev) => ({ ...prev, [id]: data }));
+      if (data) replaceMap({ ...dataRef.current, [id]: data });
       persist(async () => {
         const raw = await AsyncStorage.getItem(TRIPS_KEY);
-        const prev = raw ? JSON.parse(raw) : [];
+        const previous = raw ? JSON.parse(raw) : [];
         await AsyncStorage.multiSet([
-          [TRIPS_KEY, JSON.stringify([saved, ...(Array.isArray(prev) ? prev : [])])],
+          [TRIPS_KEY, JSON.stringify([saved, ...(Array.isArray(previous) ? previous : [])])],
           ...(data ? [[DATA_PREFIX + id, JSON.stringify(data)] as [string, string]] : []),
         ]);
       });
       return id;
     },
-    [persist],
+    [persist, replaceMap],
   );
+
   const setTripData = useCallback(
     (id: string, data: Trip) => {
-      setDataMap((prev) => ({ ...prev, [id]: data }));
+      replaceMap({ ...dataRef.current, [id]: data });
       persist(() => AsyncStorage.setItem(DATA_PREFIX + id, JSON.stringify(data)));
     },
-    [persist],
+    [persist, replaceMap],
   );
+
+  const markStage = useCallback(
+    (id: string, name: PlanningStageName, value: ReturnType<typeof stage>) =>
+      updateTrip(id, (current) => mergePlanningStage(current, name, value)),
+    [updateTrip],
+  );
+
+  const runStage = useCallback(
+    async (id: string, name: PlanningStageName, prefs: UserPreferences) => {
+      const tripData = dataRef.current[id];
+      if (!tripData?.location || !tripData.planning || name === 'landmarks') return;
+      controllers.current[id] ??= {};
+      controllers.current[id][name]?.abort();
+      const controller = new AbortController();
+      controllers.current[id][name] = controller;
+      markStage(id, name, stage('running'));
+      try {
+        if (name === 'restaurants') {
+          const result = await fetchRestaurants(tripData.location, controller.signal);
+          if (controller.signal.aborted || controllers.current[id]?.[name] !== controller) return;
+          updateTrip(id, (current) =>
+            mergePlanningStage(current, 'restaurants', stage('succeeded'), {
+              restaurants: result.restaurants,
+              notes:
+                result.meta.cache === 'stale' && result.meta.fetchedAt
+                  ? [
+                      ...(current.notes ?? []).filter(
+                        (note) => !note.startsWith('Restaurants use previously verified'),
+                      ),
+                      `Restaurants use previously verified OpenStreetMap data from ${result.meta.fetchedAt.slice(0, 10)}.`,
+                    ]
+                  : current.notes,
+            }),
+          );
+        } else if (name === 'transport') {
+          const result = await fetchTransport(tripData.location, controller.signal);
+          if (controller.signal.aborted || controllers.current[id]?.[name] !== controller) return;
+          updateTrip(id, (current) =>
+            mergePlanningStage(current, 'transport', stage('succeeded'), {
+              transport: result.transport,
+              notes:
+                result.meta.cache === 'stale' && result.meta.fetchedAt
+                  ? [
+                      ...(current.notes ?? []).filter(
+                        (note) => !note.startsWith('Transport uses previously verified'),
+                      ),
+                      `Transport uses previously verified OpenStreetMap data from ${result.meta.fetchedAt.slice(0, 10)}.`,
+                    ]
+                  : current.notes,
+            }),
+          );
+        } else if (name === 'ai') {
+          const suggestion = await requestAiSuggestion(tripData, prefs, controller.signal);
+          if (controller.signal.aborted || controllers.current[id]?.[name] !== controller) return;
+          updateTrip(id, (current) =>
+            mergePlanningStage(current, 'ai', stage('succeeded'), {}, { aiSuggestion: suggestion }),
+          );
+        }
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        const proxy = error instanceof ProxyError ? error : null;
+        markStage(
+          id,
+          name,
+          stage('failed', {
+            errorCode: proxy?.code ?? 'UPSTREAM_UNAVAILABLE',
+            message:
+              error instanceof Error ? error.message : 'This update is temporarily unavailable.',
+            retryable: proxy?.retryable ?? true,
+          }),
+        );
+      } finally {
+        if (controllers.current[id]?.[name] === controller) delete controllers.current[id][name];
+      }
+    },
+    [markStage, updateTrip],
+  );
+
+  const beginEnrichment = useCallback(
+    (id: string, prefs: UserPreferences) => {
+      void runStage(id, 'restaurants', prefs);
+      void runStage(id, 'transport', prefs);
+      if (dataRef.current[id]?.planning?.aiRequested) void runStage(id, 'ai', prefs);
+    },
+    [runStage],
+  );
+
+  const applyAiSuggestion = useCallback(
+    (id: string) =>
+      updateTrip(id, (current) => {
+        const suggestion = current.planning?.aiSuggestion;
+        if (!suggestion) return current;
+        const places = new Map(current.places.map((place) => [place.id, place]));
+        const selection = suggestion.days.map((day) =>
+          day.placeIds.map((placeId) => places.get(placeId)).filter((place) => place != null),
+        );
+        return {
+          ...current,
+          source: 'ai',
+          itinerary: buildItineraryFromSelection(selection),
+          planning: {
+            ...current.planning!,
+            revision: current.planning!.revision + 1,
+            aiSuggestion: undefined,
+          },
+        };
+      }),
+    [updateTrip],
+  );
+
+  const dismissAiSuggestion = useCallback(
+    (id: string) =>
+      updateTrip(id, (current) =>
+        current.planning
+          ? {
+              ...current,
+              planning: {
+                ...current.planning,
+                revision: current.planning.revision + 1,
+                aiSuggestion: undefined,
+              },
+            }
+          : current,
+      ),
+    [updateTrip],
+  );
+
   const deleteTrip = useCallback(
     (id: string) => {
-      setTrips((prev) => prev.filter((x) => x.id !== id));
-      setDataMap((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
-      setCurrentId((prev) => (prev === id ? null : prev));
+      for (const controller of Object.values(controllers.current[id] ?? {})) controller?.abort();
+      delete controllers.current[id];
+      setTrips((previous) => previous.filter((item) => item.id !== id));
+      const map = { ...dataRef.current };
+      delete map[id];
+      replaceMap(map);
+      setCurrentId((previous) => (previous === id ? null : previous));
       persist(async () => {
         const raw = await AsyncStorage.getItem(TRIPS_KEY);
         const list = raw ? JSON.parse(raw) : [];
         await AsyncStorage.setItem(
           TRIPS_KEY,
-          JSON.stringify(list.filter((x: SavedTrip) => x.id !== id)),
+          JSON.stringify(list.filter((item: SavedTrip) => item.id !== id)),
         );
         await AsyncStorage.multiRemove([DATA_PREFIX + id, 'norte.note.v1:' + id]);
       });
     },
-    [persist],
+    [persist, replaceMap],
   );
+
   useEffect(() => {
     if (loaded && currentId) persist(() => AsyncStorage.setItem(SELECTED_KEY, currentId));
   }, [loaded, currentId, persist]);
-  const selected = trips.find((x) => x.id === currentId) ?? trips[0];
+
+  const selected = trips.find((item) => item.id === currentId) ?? trips[0];
   const trip = useMemo<TripState>(
     () =>
       selected
@@ -177,17 +349,15 @@ export function TripProvider({ children }: { children: ReactNode }) {
           },
     [selected],
   );
+
   useEffect(() => {
     if (!loaded) return;
-
-    const now = new Date();
-    const isDuringTrip = trip.id !== '' && trip.startDate <= now && trip.endDate >= now;
-
-    // For re-engagement, if no active trip or trip is over,
-    // pass a value that triggers the 7-day reminder
-    const daysUntilNext = trip.id === '' || trip.endDate < now ? 30 : 0;
-
-    scheduleTripNotifications(trip.id !== '' ? trip : null, isDuringTrip, daysUntilNext);
+    const current = new Date();
+    const isDuringTrip = trip.id !== '' && trip.startDate <= current && trip.endDate >= current;
+    const daysUntilNext = trip.id === '' || trip.endDate < current ? 30 : 0;
+    void scheduleTripNotifications(trip.id !== '' ? trip : null, isDuringTrip, daysUntilNext).catch(
+      () => {},
+    );
   }, [loaded, trip]);
 
   return (
@@ -204,14 +374,19 @@ export function TripProvider({ children }: { children: ReactNode }) {
         setTripData,
         setGenerating,
         deleteTrip,
+        beginEnrichment,
+        retryPlanningStage: (id, name, prefs) => void runStage(id, name, prefs),
+        applyAiSuggestion,
+        dismissAiSuggestion,
       }}
     >
       {children}
     </Context.Provider>
   );
 }
+
 export function useTrip() {
-  const c = useContext(Context);
-  if (!c) throw new Error('TripProvider missing');
-  return c;
+  const context = useContext(Context);
+  if (!context) throw new Error('TripProvider missing');
+  return context;
 }

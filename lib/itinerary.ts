@@ -10,99 +10,96 @@ const interestHints: Record<string, RegExp> = {
   shopping: /market|shop/,
   nightlife: /bar/,
 };
+
 function distance(a: Place, b: Place) {
+  if (![a.lat, a.lng, b.lat, b.lng].every(Number.isFinite)) return 4;
   return Math.hypot(
     (a.lat! - b.lat!) * 111,
     (a.lng! - b.lng!) * 111 * Math.cos((a.lat! * Math.PI) / 180),
   );
 }
+
+const paceCount = (prefs: UserPreferences) =>
+  prefs.pace === 'relaxed' ? 2 : prefs.pace === 'packed' ? 5 : 3;
+
+function minutesToTime(minutes: number) {
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
+function schedule(selected: Place[]): Activity[] {
+  let cursor = 9 * 60 + 30;
+  return selected.map((place, index) => {
+    if (index) {
+      const km = distance(selected[index - 1], place);
+      cursor += Math.min(45, Math.max(15, Math.round(km * 12)));
+    }
+    if (
+      (cursor >= 13 * 60 && cursor < 14 * 60) ||
+      (cursor < 13 * 60 && cursor + (place.durationMinutes ?? 60) > 13 * 60)
+    )
+      cursor = 14 * 60;
+    const durationMinutes = place.durationMinutes ?? 60;
+    const activity: Activity = {
+      id: `place-${place.id}`,
+      time: minutesToTime(cursor),
+      title: place.name,
+      place: place.category,
+      placeName: place.name,
+      description: place.description,
+      icon: place.icon,
+      price: place.price,
+      lat: place.lat,
+      lng: place.lng,
+      url: place.url,
+      duration: place.timeToSpend,
+      durationMinutes,
+    };
+    cursor += durationMinutes;
+    return activity;
+  });
+}
+
+function titleFor(day: number, selected: Place[]) {
+  if (!selected.length) return 'A flexible day';
+  return day === 1 ? 'First impressions' : selected[0].category + ' & local discoveries';
+}
+
+export function buildItineraryFromSelection(days: Place[][]): DayPlan[] {
+  return days.map((selected, index) => ({
+    day: index + 1,
+    title: titleFor(index + 1, selected),
+    activities: schedule(selected),
+  }));
+}
+
 export function buildItinerary(
   days: number,
   places: Place[],
-  restaurants: Restaurant[],
-  destination: string,
+  _restaurants: Restaurant[],
+  _destination: string,
   prefs: UserPreferences,
 ): DayPlan[] {
-  const perDay = prefs.pace === 'relaxed' ? 2 : prefs.pace === 'packed' ? 5 : 3;
-  const score = (p: Place) =>
+  const perDay = paceCount(prefs);
+  const score = (place: Place) =>
     prefs.interests.reduce(
-      (n, it) => n + (interestHints[it]?.test((p.category + ' ' + p.name).toLowerCase()) ? 1 : 0),
+      (total, interest) =>
+        total +
+        (interestHints[interest]?.test((place.category + ' ' + place.name).toLowerCase()) ? 1 : 0),
       0,
     );
   const available = [...places].sort((a, b) => score(b) - score(a));
-  const dining = restaurants.filter((r) => r.meal === 'Lunch' || r.meal === 'Dinner');
-  const pool = dining.filter(
-    (r) =>
-      r.priceLevel == null ||
-      prefs.budget === 'standard' ||
-      (prefs.budget === 'budget' ? r.priceLevel <= 2 : r.priceLevel >= 2),
-  );
-  const meals = pool.length ? pool : dining;
-  return Array.from({ length: days }, (_, d) => {
+  const selectedDays: Place[][] = [];
+  for (let day = 0; day < days; day++) {
     const selected: Place[] = [];
     if (available.length) selected.push(available.shift()!);
     while (selected.length < perDay && available.length) {
       const last = selected[selected.length - 1];
       let best = 0;
-      for (let i = 1; i < available.length; i++)
-        if (distance(last, available[i]) < distance(last, available[best])) best = i;
+      for (let index = 1; index < available.length; index++)
+        if (distance(last, available[index]) < distance(last, available[best])) best = index;
       selected.push(available.splice(best, 1)[0]);
     }
-    const activities: Activity[] = selected.map((p, i) => ({
-      id: `day-${d + 1}-${p.id}`,
-      time: ['09:30', '11:00', '15:00', '16:30', '18:00'][i],
-      title: p.name,
-      place: p.category,
-      placeName: p.name,
-      description: p.description,
-      icon: p.icon,
-      price: p.price,
-      lat: p.lat,
-      lng: p.lng,
-      url: p.url,
-      duration: p.timeToSpend,
-    }));
-    const chosenMeals = new Set<string>();
-    for (const [i, time] of ['13:00', '19:30'].entries()) {
-      const candidates = meals.filter((r) => !chosenMeals.has(r.id));
-      const r = candidates[(d * 2 + i) % Math.max(1, candidates.length)];
-      if (r) {
-        chosenMeals.add(r.id);
-        activities.push({
-          id: `day-${d + 1}-meal-${i}-${r.id}`,
-          time,
-          title: (i === 0 ? 'Lunch' : 'Dinner') + ' at ' + r.name,
-          place: r.neighborhood,
-          description: r.description,
-          icon: 'restaurant-outline',
-          price: null,
-          lat: r.lat,
-          lng: r.lng,
-          url: r.url,
-        });
-      }
-    }
-    activities.sort((a, b) => a.time.localeCompare(b.time));
-    if (!activities.length)
-      activities.push({
-        id: `day-${d + 1}-free`,
-        time: '10:00',
-        title: 'A day to make your own',
-        place: destination,
-        description:
-          'Your planned sights are covered. Revisit a favourite or leave room for a spontaneous discovery.',
-        icon: 'walk-outline',
-        price: null,
-      });
-    return {
-      day: d + 1,
-      title:
-        d === 0
-          ? 'First impressions'
-          : selected.length
-            ? selected[0].category + ' & local discoveries'
-            : 'Leave room for serendipity',
-      activities,
-    };
-  });
+    selectedDays.push(selected);
+  }
+  return buildItineraryFromSelection(selectedDays);
 }

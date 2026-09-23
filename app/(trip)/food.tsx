@@ -10,15 +10,17 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Screen } from '@/components/screen';
-import { Body, Eyebrow, Heading, Panel, Pill, Empty } from '@/components/ui';
+import { Action, Body, Eyebrow, Heading, Panel, Pill, Empty } from '@/components/ui';
 import { CheckButton } from '@/components/check-button';
 import { TripState } from '@/components/trip-state';
 import { useTheme } from '@/hooks/use-theme';
 import { useTrip } from '@/contexts/trip-context';
 import { useProgress } from '@/contexts/progress-context';
+import { usePreferences } from '@/contexts/preferences-context';
 
 const MEAL_IMAGES = {
-  Breakfast: 'https://images.unsplash.com/photo-1528699633788-424224dc89b5?w=800&h=600&fit=crop&q=80',
+  Breakfast:
+    'https://images.unsplash.com/photo-1528699633788-424224dc89b5?w=800&h=600&fit=crop&q=80',
   Meals: 'https://images.unsplash.com/photo-1600891964092-4316c288032e?w=800&h=600&fit=crop&q=80',
   Drinks: 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=800&h=600&fit=crop&q=80',
 };
@@ -26,7 +28,8 @@ const MEAL_IMAGES = {
 export default function Food() {
   const t = useTheme();
   const { width } = useWindowDimensions();
-  const { currentTripData: data } = useTrip();
+  const { trip, currentTripData: data, retryPlanningStage } = useTrip();
+  const { prefs } = usePreferences();
   const { isDone, toggle } = useProgress();
   const [selected, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -68,10 +71,24 @@ export default function Food() {
       </View>
 
       {!data.restaurants.length ? (
-        <Empty
-          title="The tables are still being set."
-          description="Restaurant data is unavailable for this journey. Explore the city map for local dining options."
-        />
+        <View style={{ gap: 14 }}>
+          <Empty
+            title="The tables are still being set."
+            description={
+              data.planning?.stages.restaurants.state === 'running'
+                ? 'Verified restaurant results are loading in the background.'
+                : (data.planning?.stages.restaurants.message ??
+                  'Restaurant data is unavailable for this journey. Explore the city map for local dining options.')
+            }
+          />
+          {data.planning?.stages.restaurants.retryable && (
+            <Action
+              label="Retry restaurant search"
+              subtle
+              onPress={() => retryPlanningStage(trip.id, 'restaurants', prefs)}
+            />
+          )}
+        </View>
       ) : (
         <>
           <View
@@ -111,7 +128,15 @@ export default function Food() {
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <Ionicons name={cat.icon} size={20} color="#FFFFFF" />
-                        <Text style={{ fontSize: 20, fontWeight: '700', color: '#FFFFFF', letterSpacing: -0.5, fontFamily: 'Georgia' }}>
+                        <Text
+                          style={{
+                            fontSize: 20,
+                            fontWeight: '700',
+                            color: '#FFFFFF',
+                            letterSpacing: -0.5,
+                            fontFamily: 'Georgia',
+                          }}
+                        >
                           {cat.label}
                         </Text>
                       </View>

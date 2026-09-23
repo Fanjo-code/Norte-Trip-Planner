@@ -5,6 +5,7 @@ import { geocode, reverseGeocode } from './lib/geocode.mjs';
 import { getPlaces, getRestaurants, getTransport } from './lib/overpass.mjs';
 import { getWeather } from './lib/weather.mjs';
 import { aiConfigured, enrichTrip } from './lib/ai.mjs';
+import { AppError, publicError } from './lib/errors.mjs';
 try {
   loadEnvFile();
 } catch {}
@@ -20,6 +21,20 @@ const reply = (res, status, data) => {
   res.end(JSON.stringify(data));
 };
 const server = http.createServer(async (req, res) => {
+  const requestId = Math.random().toString(36).slice(2, 10);
+  const startedAt = Date.now();
+  res.once('finish', () =>
+    console.log(
+      JSON.stringify({
+        scope: 'request',
+        requestId,
+        method: req.method,
+        path: req.url?.split('?')[0],
+        status: res.statusCode,
+        elapsedMs: Date.now() - startedAt,
+      }),
+    ),
+  );
   if (req.method === 'OPTIONS') {
     res.writeHead(204, headers);
     res.end();
@@ -29,52 +44,72 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
     const q = url.searchParams;
     if (url.pathname === '/health') {
-      reply(res, 200, { status: 'ok', aiConfigured: aiConfigured() });
+      reply(res, 200, { status: 'ok', aiConfigured: aiConfigured(), requestId });
       return;
     }
     if (url.pathname === '/api/ai-plan') {
       if (req.method !== 'POST') {
-        reply(res, 405, { error: 'Method not allowed' });
-        return;
+        throw new AppError('INVALID_REQUEST', 'ai', 'Method not allowed.', {
+          status: 405,
+          retryable: false,
+        });
       }
       let body = '';
       for await (const chunk of req) {
         body += chunk;
         if (Buffer.byteLength(body) > 500000) {
-          reply(res, 413, { error: 'Request is too large.' });
-          return;
+          throw new AppError('INVALID_REQUEST', 'ai', 'Request is too large.', {
+            status: 413,
+            retryable: false,
+          });
         }
       }
       let parsed;
       try {
         parsed = JSON.parse(body);
       } catch {
-        reply(res, 400, { error: 'Valid JSON is required.' });
-        return;
-      }
-      try {
-        reply(res, 200, { trip: await enrichTrip(parsed.trip, parsed.prefs) });
-      } catch (e) {
-        reply(res, e.status ?? 502, {
-          error:
-            e.status === 400 || e.status === 503
-              ? e.message
-              : 'AI editing is temporarily unavailable. Your live itinerary is still ready.',
+        throw new AppError('INVALID_REQUEST', 'ai', 'Valid JSON is required.', {
+          status: 400,
+          retryable: false,
         });
       }
+      const data = await enrichTrip(parsed.trip, parsed.prefs);
+      reply(res, 200, {
+        data,
+        meta: { requestId, source: 'configured-ai', elapsedMs: Date.now() - startedAt },
+      });
       return;
     }
     if (req.method !== 'GET') {
-      reply(res, 405, { error: 'Method not allowed' });
-      return;
+      throw new AppError('INVALID_REQUEST', 'landmarks', 'Method not allowed.', {
+        status: 405,
+        retryable: false,
+      });
     }
     if (url.pathname === '/api/geocode') {
       const city = q.get('q')?.trim();
       if (!city || city.length > 150) {
-        reply(res, 400, { error: 'Enter a city name (up to 150 characters).' });
+        throw new AppError(
+          'INVALID_REQUEST',
+          'geocode',
+          'Enter a city name (up to 150 characters).',
+          {
+            status: 400,
+            retryable: false,
+          },
+        );
         return;
       }
-      reply(res, 200, await geocode(city));
+      const result = await geocode(city);
+      reply(res, 200, {
+        data: { results: result.results },
+        meta: {
+          ...result.meta,
+          requestId,
+          elapsedMs: Date.now() - startedAt,
+          count: result.results.length,
+        },
+      });
       return;
     }
     const lat = Number(q.get('lat')),
@@ -89,46 +124,69 @@ const server = http.createServer(async (req, res) => {
       Math.abs(lng) > 180 ||
       !Number.isFinite(radius)
     ) {
-      reply(res, 400, { error: 'Valid coordinates are required.' });
-      return;
+      throw new AppError('INVALID_REQUEST', 'landmarks', 'Valid coordinates are required.', {
+        status: 400,
+        retryable: false,
+      });
     }
     switch (url.pathname) {
       case '/api/places':
-        reply(res, 200, { places: await getPlaces(lat, lng, radius) });
+        {
+          const result = await getPlaces(lat, lng, radius);
+          reply(res, 200, {
+            data: { places: result.places },
+            meta: { ...result.meta, requestId, elapsedMs: Date.now() - startedAt },
+          });
+        }
         break;
       case '/api/restaurants':
-        reply(res, 200, {
-          restaurants: await getRestaurants(lat, lng, radius, q.get('city') ?? 'porto'),
-        });
+        {
+          const result = await getRestaurants(lat, lng, radius);
+          reply(res, 200, {
+            data: { restaurants: result.restaurants },
+            meta: { ...result.meta, requestId, elapsedMs: Date.now() - startedAt },
+          });
+        }
         break;
       case '/api/transport':
-        reply(res, 200, await getTransport(lat, lng, radius));
+        {
+          const result = await getTransport(lat, lng, radius);
+          reply(res, 200, {
+            data: { stations: result.stations, routes: result.routes },
+            meta: { ...result.meta, requestId, elapsedMs: Date.now() - startedAt },
+          });
+        }
         break;
       case '/api/reverse-geocode':
-        reply(res, 200, await reverseGeocode(lat, lng));
+        reply(res, 200, {
+          data: await reverseGeocode(lat, lng),
+          meta: { requestId, elapsedMs: Date.now() - startedAt },
+        });
         break;
       case '/api/weather':
         if (
           !/^\d{4}-\d{2}-\d{2}$/.test(q.get('startDate') ?? '') ||
           !/^\d{4}-\d{2}-\d{2}$/.test(q.get('endDate') ?? '')
         ) {
-          reply(res, 400, { error: 'Valid dates are required.' });
-          break;
+          throw new AppError('INVALID_REQUEST', 'weather', 'Valid dates are required.', {
+            status: 400,
+            retryable: false,
+          });
         }
         reply(res, 200, {
-          weather: await getWeather(lat, lng, q.get('startDate'), q.get('endDate')),
+          data: { weather: await getWeather(lat, lng, q.get('startDate'), q.get('endDate')) },
+          meta: { requestId, elapsedMs: Date.now() - startedAt },
         });
         break;
       default:
-        reply(res, 404, { error: 'Not found' });
+        throw new AppError('INVALID_REQUEST', 'landmarks', 'Endpoint not found.', {
+          status: 404,
+          retryable: false,
+        });
     }
   } catch (e) {
-    console.error('[travel]', e.message);
-    reply(res, 502, {
-      error: e.message?.includes('City not found')
-        ? e.message
-        : 'The city data service is busy. Please try again shortly.',
-    });
+    const error = publicError(e, requestId);
+    reply(res, error.status, error.body);
   }
 });
 server.listen(port, '0.0.0.0', () => console.log('Norte travel data ready on port ' + port));

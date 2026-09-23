@@ -9,8 +9,9 @@ import { DateField, TextField } from '@/components/field';
 import { useTheme } from '@/hooks/use-theme';
 import { useTrip } from '@/contexts/trip-context';
 import { usePreferences, PACE_LABELS, BUDGET_LABELS } from '@/contexts/preferences-context';
-import { generateTrip } from '@/services/travel';
-import { enrichTrip, isAiAvailable } from '@/services/ai';
+import { createCoreTrip, searchCities } from '@/services/travel';
+import { isAiAvailable } from '@/services/ai';
+import type { LocationIdentity } from '@/types/trip';
 import { addDays, daysBetween, formatDateRange, localISO } from '@/lib/format';
 import { getDestinationImage } from '@/data/destinations';
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -20,7 +21,7 @@ export default function NewTrip() {
   const params = useLocalSearchParams<{ destination?: string }>();
   const [destination, setDestination] = useState(params.destination ?? '');
   const { prefs } = usePreferences();
-  const { addTrip, setGenerating } = useTrip();
+  const { addTrip, beginEnrichment, setGenerating } = useTrip();
   const [start, setStart] = useState(addDays(new Date(), 1));
   const [end, setEnd] = useState(addDays(new Date(), 4));
   const [mode, setMode] = useState<'exact' | 'flexible'>('exact');
@@ -29,7 +30,9 @@ export default function NewTrip() {
   const [duration, setDuration] = useState(5);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [step, setStep] = useState(0);
+  const [planningMessage, setPlanningMessage] = useState('Resolving your destination…');
+  const [locations, setLocations] = useState<LocationIdentity[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<LocationIdentity | null>(null);
   const abort = useRef<AbortController | null>(null);
   const [aiAvailable, setAiAvailable] = useState(false);
   const [useAi, setUseAi] = useState(false);
@@ -48,11 +51,6 @@ export default function NewTrip() {
     },
     [],
   );
-  useEffect(() => {
-    if (!loading) return;
-    const timer = setInterval(() => setStep((s) => Math.min(2, s + 1)), 6500);
-    return () => clearInterval(timer);
-  }, [loading]);
   let flexibleStart = new Date(year, month, 1, 12);
   if (localISO(flexibleStart) < localISO(new Date())) flexibleStart = addDays(new Date(), 1);
   while (flexibleStart.getDay() !== 2) flexibleStart = addDays(flexibleStart, 1);
@@ -87,33 +85,34 @@ export default function NewTrip() {
     setLoading(true);
     setGenerating(true);
     setError('');
-    setStep(0);
     try {
-      let data = await generateTrip(
-        destination.trim(),
+      let location = selectedLocation;
+      if (!location) {
+        setPlanningMessage('Finding matching cities…');
+        const matches = await searchCities(destination.trim(), controller.signal);
+        if (controller.signal.aborted) return;
+        setLocations(matches);
+        if (!matches.length) throw new Error('No matching city was found. Try a nearby city name.');
+        if (matches.length > 1) return;
+        location = matches[0];
+        setSelectedLocation(location);
+      }
+      setPlanningMessage('Finding verified landmarks…');
+      const data = await createCoreTrip(
+        location,
         finalStart,
         finalEnd,
         prefs,
+        useAi,
         controller.signal,
       );
       if (controller.signal.aborted) return;
       if (!data) throw new Error('No plan was returned. Please try again.');
-      if (useAi) {
-        try {
-          data = await enrichTrip(data, prefs, controller.signal);
-        } catch {
-          if (controller.signal.aborted) return;
-          data = {
-            ...data,
-            notes: [
-              ...(data.notes ?? []),
-              'AI editing was unavailable. Your complete live-data plan is ready.',
-            ],
-          };
-        }
-      }
-      if (controller.signal.aborted) return;
-      addTrip({ destination: data.destination, startDate: finalStart, endDate: finalEnd }, data);
+      const id = addTrip(
+        { destination: data.destination, startDate: finalStart, endDate: finalEnd },
+        data,
+      );
+      beginEnrichment(id, prefs);
       router.replace('/(trip)/overview');
     } catch (e) {
       if (!controller.signal.aborted)
@@ -151,15 +150,7 @@ export default function NewTrip() {
             <Panel style={{ paddingVertical: 48, alignItems: 'center', gap: 25 }}>
               <ActivityIndicator size="large" color={t.accent} />
               <Heading>Getting to know {destination}.</Heading>
-              <Body>
-                {
-                  [
-                    'Finding your city and its landmarks…',
-                    'Gathering local tables and neighbourhood favourites…',
-                    'Bringing your days together. Good things take a little time.',
-                  ][step]
-                }
-              </Body>
+              <Body>{planningMessage}</Body>
               <Text style={{ color: t.textSecondary, fontSize: 12 }}>
                 Your plan uses real places, with room for spontaneity.
               </Text>
@@ -181,9 +172,36 @@ export default function NewTrip() {
                   icon="location-outline"
                   placeholder="Try Porto, Paris, or Rome…"
                   value={destination}
-                  onChangeText={setDestination}
+                  onChangeText={(value) => {
+                    setDestination(value);
+                    setSelectedLocation(null);
+                    setLocations([]);
+                  }}
                   autoCapitalize="words"
                 />
+                {locations.length > 0 && (
+                  <View style={{ gap: 8 }}>
+                    <Text style={{ color: t.text, fontSize: 13, fontWeight: '600' }}>
+                      Choose the right place
+                    </Text>
+                    {locations.map((location) => (
+                      <Pressable
+                        key={location.id}
+                        onPress={() => setSelectedLocation(location)}
+                        style={{
+                          padding: 12,
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: selectedLocation?.id === location.id ? t.accent : t.hairline,
+                          backgroundColor:
+                            selectedLocation?.id === location.id ? t.accentSoft : t.card,
+                        }}
+                      >
+                        <Text style={{ color: t.text, fontSize: 13 }}>{location.displayName}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <Pill
                     label="I know my dates"
@@ -270,13 +288,13 @@ export default function NewTrip() {
                 {aiAvailable && (
                   <View style={{ gap: 10 }}>
                     <Pill
-                      label={useAi ? 'AI travel writing enabled' : 'Add AI travel writing'}
+                      label={useAi ? 'AI itinerary suggestion enabled' : 'Add an AI suggestion'}
                       active={useAi}
                       onPress={() => setUseAi((v) => !v)}
                     />
                     <Text style={{ fontSize: 11, color: t.textSecondary }}>
-                      Optional: share this itinerary and your travel preferences with the configured
-                      AI provider to refine the writing.
+                      Optional: the configured AI provider may arrange verified place IDs. You can
+                      compare its suggestion before applying it.
                     </Text>
                   </View>
                 )}
@@ -301,7 +319,11 @@ export default function NewTrip() {
                   </Text>
                 </View>
               )}
-              <Action label="Create my journey" icon="arrow-forward" onPress={handlePlan} />
+              <Action
+                label={selectedLocation ? 'Create my journey' : 'Find my city'}
+                icon="arrow-forward"
+                onPress={handlePlan}
+              />
               <Text style={{ textAlign: 'center', fontSize: 11, color: t.textSecondary }}>
                 No bookings. No rush. Just a very good plan.
               </Text>

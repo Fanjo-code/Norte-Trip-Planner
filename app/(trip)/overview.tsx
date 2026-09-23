@@ -17,7 +17,14 @@ import { Fonts } from '@/constants/theme';
 export default function Guide() {
   const t = useTheme();
   const { width } = useWindowDimensions();
-  const { trip, currentTripData: data, storageError } = useTrip();
+  const {
+    trip,
+    currentTripData: data,
+    storageError,
+    retryPlanningStage,
+    applyAiSuggestion,
+    dismissAiSuggestion,
+  } = useTrip();
   const { getCityRecord, getCityProgress } = useCityProgress();
   const { isDone } = useProgress();
   const { prefs } = usePreferences();
@@ -34,6 +41,58 @@ export default function Guide() {
         imageUrl={getDestinationImage(trip.destination)}
       />
       {storageError && <Body>{storageError}</Body>}
+      {data.planning && (
+        <Panel style={{ gap: 14 }}>
+          <Eyebrow>PLANNING UPDATES</Eyebrow>
+          {(['restaurants', 'transport', 'ai'] as const).map((name) => {
+            const item = data.planning!.stages[name];
+            if (name === 'ai' && !data.planning!.aiRequested) return null;
+            const label =
+              name === 'restaurants'
+                ? 'Eat & Drink'
+                : name === 'transport'
+                  ? 'Transport'
+                  : 'AI suggestion';
+            return (
+              <View key={name} style={{ gap: 6 }}>
+                <Text style={{ color: t.text, fontSize: 13, fontWeight: '600' }}>
+                  {label}: {item.state === 'running' ? 'updating…' : item.state}
+                </Text>
+                {item.message && <Body>{item.message}</Body>}
+                {(item.state === 'failed' || item.state === 'interrupted') && item.retryable && (
+                  <Pressable onPress={() => retryPlanningStage(trip.id, name, prefs)}>
+                    <Text style={{ color: t.accent, fontSize: 12 }}>
+                      Retry {label.toLowerCase()} ↗
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+            );
+          })}
+        </Panel>
+      )}
+      {data.planning?.aiSuggestion && (
+        <Panel style={{ gap: 14, borderColor: t.accent }}>
+          <Eyebrow>AI ITINERARY SUGGESTION</Eyebrow>
+          <Heading>Review before applying</Heading>
+          <Body>The suggestion only rearranges verified places. It cannot change their facts.</Body>
+          {data.planning.aiSuggestion.days.map((day) => (
+            <View key={day.day} style={{ gap: 4 }}>
+              <Text style={{ color: t.text, fontSize: 13, fontWeight: '600' }}>Day {day.day}</Text>
+              <Text style={{ color: t.textSecondary, fontSize: 12, lineHeight: 18 }}>
+                {day.placeIds
+                  .map((id) => data.places.find((place) => place.id === id)?.name)
+                  .filter(Boolean)
+                  .join(' → ') || 'Flexible day'}
+              </Text>
+            </View>
+          ))}
+          <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+            <Action label="Apply suggestion" onPress={() => applyAiSuggestion(trip.id)} />
+            <Action label="Dismiss" subtle onPress={() => dismissAiSuggestion(trip.id)} />
+          </View>
+        </Panel>
+      )}
       <View style={{ flexDirection: width > 850 ? 'row' : 'column', gap: 24 }}>
         <View style={{ flex: 1.8, gap: 24 }}>
           <View style={{ gap: 8 }}>
