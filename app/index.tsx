@@ -18,7 +18,6 @@ import { useTheme } from '@/hooks/use-theme';
 import { useTrip } from '@/contexts/trip-context';
 import { useCityProgress } from '@/contexts/city-progress-context';
 import { getDestinationImage } from '@/data/destinations';
-import { fetchImageForCity } from '@/services/ai';
 import { daysBetween, formatDateRange, parseDate } from '@/lib/format';
 import { Fonts } from '@/constants/theme';
 const cities = [

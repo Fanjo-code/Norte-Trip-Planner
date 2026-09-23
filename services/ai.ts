@@ -1,5 +1,5 @@
 import type { Trip, UserPreferences } from '@/types/trip';
-const BASE = process.env.EXPO_PUBLIC_GEMINI_URL ?? 'https://generativelanguage.googleapis.com/v1beta';
+const BASE = (process.env.EXPO_PUBLIC_PROXY_URL ?? 'http://localhost:8787').replace(/\/$/, '');
 export async function isAiAvailable(): Promise<boolean> {
   try {
     const controller = new AbortController();
@@ -23,7 +23,7 @@ export async function enrichTrip(
   const abort = () => controller.abort();
   signal?.addEventListener('abort', abort, { once: true });
   if (signal?.aborted) controller.abort();
-  const timer = setTimeout(abort, 60000);
+  const timer = setTimeout(abort, 120000);
   try {
     const response = await fetch(BASE + '/api/ai-plan', {
       method: 'POST',
@@ -33,6 +33,8 @@ export async function enrichTrip(
     });
     const body = await response.json();
     if (!response.ok) throw new Error(body.error ?? 'AI enrichment is unavailable.');
+    if (!body.trip || !Array.isArray(body.trip.itinerary))
+      throw new Error('AI enrichment returned an invalid trip.');
     return body.trip;
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') throw e;
