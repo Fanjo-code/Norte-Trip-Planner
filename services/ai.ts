@@ -3,7 +3,7 @@ const BASE = (process.env.EXPO_PUBLIC_PROXY_URL ?? 'http://localhost:8787').repl
 export async function isAiAvailable(): Promise<boolean> {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
+    const timer = setTimeout(() => controller.abort(), 120000);
     try {
       const response = await fetch(BASE + '/health', { signal: controller.signal });
       return response.ok && Boolean((await response.json()).aiConfigured);

@@ -24,7 +24,7 @@ export async function cached(key, ttl, fn) {
     inflight.delete(key);
   }
 }
-export async function fetchJson(url, options = {}, ms = 15000) {
+export async function fetchJson(url, options = {}, ms = 120000) {
   const response = await fetch(url, { ...options, signal: AbortSignal.timeout(ms) });
   if (!response.ok) throw new Error('Data provider returned ' + response.status);
   return response.json();
