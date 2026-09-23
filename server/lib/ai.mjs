@@ -45,23 +45,36 @@ export async function enrichTrip(trip, prefs) {
   ) {
     throw Object.assign(new Error('A valid live itinerary is required.'), { status: 400 });
   }
-  const groq = Boolean(process.env.GROQ_API_KEY);
-  const base = groq
-    ? 'https://api.groq.com/openai/v1'
-    : process.env.OMNIROUTE_BASE_URL.replace(/\/$/, '');
-  const key = groq ? process.env.GROQ_API_KEY : process.env.OMNIROUTE_API_KEY;
+  const gemini = Boolean(process.env.GEMINI_API_KEY);
+  const modelName = gemini ? 'gemini-1.5-flash' : (process.env.GROQ_MODEL || 'llama-3.3-70b-versatile');
+  const base = gemini
+    ? 'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':generateContent'
+    : (Boolean(process.env.GROQ_API_KEY)
+        ? 'https://api.groq.com/openai/v1'
+        : (process.env.OMNIROUTE_BASE_URL || '').replace(/\/$/, ''));
+  const key = gemini
+    ? process.env.GEMINI_API_KEY
+    : (process.env.GROQ_API_KEY || process.env.OMNIROUTE_API_KEY);
   const model = groq
     ? process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
     : process.env.OMNIROUTE_MODEL || 'auto/best-free';
-  const response = await fetchJson(
-    base + '/chat/completions',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(key ? { Authorization: 'Bearer ' + key } : {}),
-      },
-      body: JSON.stringify({
+  const payload = gemini
+    ? {
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text:
+                  'You are a concise travel editor. Improve day titles and activity descriptions using only supplied facts and traveler preferences. Never invent prices, ratings, hours, recommendations, names or coordinates. Do not add, remove, reorder or reschedule activities. Return only JSON: {"days":[{"day":1,"title":"...","activities":[{"id":"original-id","description":"..."}]}]}. Include every day and original activity ID exactly once.\n\n' +
+                  JSON.stringify({ destination: trip.destination, preferences: prefs, days: trip.itinerary }),
+              },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0.4, maxOutputTokens: 8000 },
+      }
+    : {
         model,
         temperature: 0.4,
         max_tokens: 8000,
@@ -80,11 +93,22 @@ export async function enrichTrip(trip, prefs) {
             }),
           },
         ],
-      }),
+      };
+  const response = await fetchJson(
+    base + (gemini ? '' : '/chat/completions'),
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(key ? { Authorization: 'Bearer ' + key, ...(gemini ? { 'x-goog-api-key': key } : {}) } : {}),
+      },
+      body: JSON.stringify(payload),
     },
     25000,
   );
-  const text = response.choices?.[0]?.message?.content;
+  const text = gemini
+    ? response.candidates?.[0]?.content?.parts?.[0]?.text
+    : response.choices?.[0]?.message?.content;
   if (typeof text !== 'string') throw new Error('The AI returned an empty response.');
   const editorial = JSON.parse(text.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/, ''));
   return applyEditorialPlan(trip, editorial);

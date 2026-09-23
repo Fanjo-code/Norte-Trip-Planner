@@ -1,5 +1,5 @@
 import type { Trip, UserPreferences } from '@/types/trip';
-const BASE = process.env.EXPO_PUBLIC_GROQ_URL ?? 'https://api.groq.com/openai/v1';
+const BASE = process.env.EXPO_PUBLIC_GEMINI_URL ?? 'https://generativelanguage.googleapis.com/v1beta';
 export async function isAiAvailable(): Promise<boolean> {
   try {
     const controller = new AbortController();
