@@ -35,7 +35,7 @@ export default function Food() {
   const mealCategories = [
     { key: 'Breakfast', label: 'Morning coffee', icon: 'cafe-outline' as const },
     { key: 'Meals', label: 'Lunch & dinner', icon: 'restaurant-outline' as const },
-    { key: 'Drinks', label: 'Nightcap', icon: 'wine-outline' as const },
+    { key: 'Drinks', label: 'Bar rounds', icon: 'wine-outline' as const },
   ];
 
   const mealMap: Record<string, string[]> = {
