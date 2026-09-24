@@ -132,7 +132,7 @@ export async function getPlaces(lat, lng, radius = 8000) {
   const result = await run(query, {
     stage: 'landmarks',
     freshMs: 7 * 86400000,
-    staleMs: 83 * 86400000,
+    staleMs: 90 * 86400000,
   });
   const score = (place) =>
     (place.tags.wikipedia ? 80 : 0) +
@@ -177,7 +177,7 @@ export async function getRestaurants(lat, lng, radius = 3000) {
   const result = await run(query, {
     stage: 'restaurants',
     freshMs: 86400000,
-    staleMs: 29 * 86400000,
+    staleMs: 30 * 86400000,
     allowEmpty: true,
     optional: true,
   });
@@ -197,7 +197,7 @@ export async function getTransport(lat, lng, radius = 5000) {
   const result = await run(query, {
     stage: 'transport',
     freshMs: 7 * 86400000,
-    staleMs: 83 * 86400000,
+    staleMs: 90 * 86400000,
     allowEmpty: true,
     optional: true,
   });

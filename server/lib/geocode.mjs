@@ -25,16 +25,26 @@ export async function geocode(query) {
     'geo:' + query.toLowerCase().trim(),
     {
       freshMs: 30 * 86400000,
-      staleMs: 150 * 86400000,
+      staleMs: 180 * 86400000,
       validate: (data) => Array.isArray(data) && data.length > 0,
     },
     async () => {
-      const data = await nominatim('search', {
-        q: query,
-        format: 'json',
-        limit: '8',
-        addressdetails: '1',
-      });
+      let data;
+      try {
+        data = await nominatim('search', {
+          q: query,
+          format: 'json',
+          limit: '8',
+          addressdetails: '1',
+        });
+      } catch (error) {
+        throw new AppError(
+          error.code === 'UPSTREAM_TIMEOUT' ? 'UPSTREAM_TIMEOUT' : 'UPSTREAM_UNAVAILABLE',
+          'geocode',
+          'City search is temporarily unavailable. Please retry.',
+          { cause: error },
+        );
+      }
       const results = data
         .filter((r) =>
           ['city', 'town', 'village', 'municipality', 'administrative'].includes(r.type),

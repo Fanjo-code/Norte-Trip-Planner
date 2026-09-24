@@ -112,6 +112,9 @@ export async function enrichTrip(trip, prefs) {
         content: JSON.stringify({
           days: trip.itinerary.length,
           pace: prefs?.pace,
+          maxPlacesPerDay: paceCount(prefs),
+          requiredTotalPlaces: Math.min(trip.places.length, trip.itinerary.length * paceCount(prefs)),
+          selectionRules: 'Use exactly requiredTotalPlaces distinct candidate IDs across all days. Never exceed maxPlacesPerDay on any day. Return each day as {day: number, placeIds: string[]} with no other fields.',
           interests: prefs?.interests ?? [],
           candidates: trip.places.map(({ id, name, category, lat, lng }) => ({
             id,
