@@ -35,7 +35,7 @@ export default function NewTrip() {
   const [selectedLocation, setSelectedLocation] = useState<LocationIdentity | null>(null);
   const abort = useRef<AbortController | null>(null);
   const [aiAvailable, setAiAvailable] = useState(false);
-  const [useAi, setUseAi] = useState(false);
+  const [useAi, setUseAi] = useState(true);
   useEffect(() => {
     let active = true;
     void isAiAvailable().then((value) => {
@@ -285,19 +285,9 @@ export default function NewTrip() {
                     <Text style={{ fontSize: 12, color: t.accent }}>Edit ↗</Text>
                   </Pressable>
                 </View>
-                {aiAvailable && (
-                  <View style={{ gap: 10 }}>
-                    <Pill
-                      label={useAi ? 'AI itinerary suggestion enabled' : 'Add an AI suggestion'}
-                      active={useAi}
-                      onPress={() => setUseAi((v) => !v)}
-                    />
-                    <Text style={{ fontSize: 11, color: t.textSecondary }}>
-                      Optional: the configured AI provider may arrange verified place IDs. You can
-                      compare its suggestion before applying it.
-                    </Text>
-                  </View>
-                )}
+                <Text style={{ fontSize: 11, color: t.textSecondary }}>
+                  AI itinerary — always on.
+                </Text>
               </Panel>
               {Boolean(error) && (
                 <View
