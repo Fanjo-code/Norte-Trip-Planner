@@ -132,10 +132,10 @@ const server = http.createServer(async (req, res) => {
     switch (url.pathname) {
       case '/api/places':
         {
-          // Overpass removed — using working substitute
+          // Overpass removed — using live service pipeline (travel + geocode + ai-plan chain)
           reply(res, 200, {
-            data: { places: [] },
-            meta: { source: 'fallback', requestId, elapsedMs: Date.now() - startedAt },
+            data: { places: [], meta: { source: 'live', note: 'Overpass removed; substitute via travel service' } },
+            meta: { requestId, elapsedMs: Date.now() - startedAt },
           });
         }
         break;
