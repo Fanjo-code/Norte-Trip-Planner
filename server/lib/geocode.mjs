@@ -61,7 +61,8 @@ export async function geocode(query) {
           lng: Number(r.lon),
           boundingBox: Array.isArray(r.boundingbox) ? r.boundingbox.map(Number) : null,
         }))
-        .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lng));
+        .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lng))
+      .filter((r, i, arr) => arr.findIndex(x => x.displayName === r.displayName && Math.abs(x.lat - r.lat) < 0.01 && Math.abs(x.lng - r.lng) < 0.01) === i);
       if (!results.length)
         throw new AppError(
           'NO_RESULTS',

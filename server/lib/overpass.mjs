@@ -12,7 +12,11 @@ let optionalQueue = Promise.resolve();
 const logAttempt = (details) => console.log(JSON.stringify({ scope: 'overpass', ...details }));
 
 function orderedEndpoints() {
-  const ready = endpoints.filter((endpoint) => health.get(endpoint).retryAt <= Date.now());
+  const now = Date.now();
+  const ready = endpoints.filter((endpoint) => {
+    const h = health.get(endpoint);
+    return !h || h.retryAt <= now;
+  });
   return ready.length ? ready : endpoints;
 }
 
