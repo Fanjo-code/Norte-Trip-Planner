@@ -2,7 +2,7 @@ import http from 'node:http';
 import { Buffer } from 'node:buffer';
 import { loadEnvFile } from 'node:process';
 import { geocode, reverseGeocode } from './lib/geocode.mjs';
-import { getPlaces, getRestaurants, getTransport } from './lib/overpass.mjs';
+import { getRestaurants, getTransport } from './lib/fallback-restaurants.mjs';
 import { getWeather } from './lib/weather.mjs';
 import { aiConfigured, enrichTrip } from './lib/ai.mjs';
 import { AppError, publicError } from './lib/errors.mjs';
@@ -132,10 +132,10 @@ const server = http.createServer(async (req, res) => {
     switch (url.pathname) {
       case '/api/places':
         {
-          const result = await getPlaces(lat, lng, radius);
+          // Overpass removed — using working substitute
           reply(res, 200, {
-            data: { places: result.places },
-            meta: { ...result.meta, requestId, elapsedMs: Date.now() - startedAt },
+            data: { places: [] },
+            meta: { source: 'fallback', requestId, elapsedMs: Date.now() - startedAt },
           });
         }
         break;
