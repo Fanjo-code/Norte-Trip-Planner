@@ -4,6 +4,7 @@ import { loadEnvFile } from 'node:process';
 import { geocode, reverseGeocode } from './lib/geocode.mjs';
 import { getRestaurants, getTransport } from './lib/fallback-restaurants.mjs';
 import { getWeather } from './lib/weather.mjs';
+import { getPlaces } from './lib/places.mjs';
 import { aiConfigured, enrichTrip } from './lib/ai.mjs';
 import { AppError, publicError } from './lib/errors.mjs';
 try {
@@ -132,10 +133,10 @@ const server = http.createServer(async (req, res) => {
     switch (url.pathname) {
       case '/api/places':
         {
-          // Overpass removed — using live service pipeline (travel + geocode + ai-plan chain)
+          const result = await getPlaces(lat, lng, radius);
           reply(res, 200, {
-            data: { places: [], meta: { source: 'live', note: 'Overpass removed; substitute via travel service' } },
-            meta: { requestId, elapsedMs: Date.now() - startedAt },
+            data: { places: result.places },
+            meta: { ...result.meta, requestId, elapsedMs: Date.now() - startedAt },
           });
         }
         break;

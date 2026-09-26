@@ -17,7 +17,7 @@ export function publicError(error, requestId) {
       error: {
         code: known ? error.code : 'UPSTREAM_UNAVAILABLE',
         stage: known ? error.stage : 'landmarks',
-        message: known ? error.message : 'The travel data service is temporarily unavailable.',
+        message: known ? error.message : 'Service unavailable — retry after server restart.',
         retryable: known ? error.retryable : true,
         requestId,
       },
