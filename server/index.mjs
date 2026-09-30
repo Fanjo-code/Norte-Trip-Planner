@@ -2,7 +2,7 @@ import http from 'node:http';
 import { Buffer } from 'node:buffer';
 import { loadEnvFile } from 'node:process';
 import { geocode, reverseGeocode } from './lib/geocode.mjs';
-import { getRestaurants, getTransport } from './lib/fallback-restaurants.mjs';
+import { getRestaurants, getTransport } from './lib/overpass.mjs';
 import { getWeather } from './lib/weather.mjs';
 import { getPlaces } from './lib/places.mjs';
 import { aiConfigured, enrichTrip } from './lib/ai.mjs';

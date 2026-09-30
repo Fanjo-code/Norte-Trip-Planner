@@ -4,117 +4,43 @@
  */
 
 export const FALLBACK_RESTAURANTS = {
+  porto: [
+    { id: 'porto-rest-1', name: 'Casa Guedes', amenity: 'restaurant', cuisine: 'portuguese', lat: 41.1495, lng: -8.6105 },
+    { id: 'porto-rest-2', name: 'Tapabento', amenity: 'restaurant', cuisine: 'portuguese', lat: 41.1480, lng: -8.6090 },
+    { id: 'porto-rest-3', name: 'DOP', amenity: 'restaurant', cuisine: 'mediterranean', lat: 41.1460, lng: -8.6140 },
+    { id: 'porto-rest-4', name: 'Vila Joya', amenity: 'restaurant', cuisine: 'portuguese', lat: 41.1430, lng: -8.6180 },
+    { id: 'porto-cafe-1', name: 'Majestic Café', amenity: 'cafe', cuisine: 'coffee_shop', lat: 41.1475, lng: -8.6112 },
+    { id: 'porto-cafe-2', name: 'Café Santiago', amenity: 'cafe', cuisine: 'coffee_shop', lat: 41.1490, lng: -8.6120 },
+    { id: 'porto-bar-1', name: 'Planot', amenity: 'bar', cuisine: 'cocktails', lat: 41.1503, lng: -8.6101 },
+    { id: 'porto-bar-2', name: 'Adega São Nicolau', amenity: 'bar', cuisine: 'portuguese', lat: 41.1443, lng: -8.6138 },
+  ],
   munich: [
-    {
-      id: 'fallback-munich-cafe-1',
-      name: 'Cafe Frischhut',
-      amenity: 'cafe',
-      cuisine: 'coffee_shop',
-      lat: 48.1351,
-      lng: 11.582,
-    },
-    {
-      id: 'fallback-munich-cafe-2',
-      name: 'Man vs Machine',
-      amenity: 'cafe',
-      cuisine: 'coffee_shop',
-      lat: 48.1376,
-      lng: 11.5759,
-    },
-    {
-      id: 'fallback-munich-cafe-3',
-      name: 'Cafe Luitpold',
-      amenity: 'cafe',
-      cuisine: 'coffee_shop',
-      lat: 48.1425,
-      lng: 11.5778,
-    },
-    {
-      id: 'fallback-munich-rest-1',
-      name: 'Augustiner-Brau',
-      amenity: 'restaurant',
-      cuisine: 'bavarian',
-      lat: 48.1445,
-      lng: 11.5582,
-    },
-    {
-      id: 'fallback-munich-rest-2',
-      name: 'Ratskeller Munchen',
-      amenity: 'restaurant',
-      cuisine: 'german',
-      lat: 48.1374,
-      lng: 11.5755,
-    },
-    {
-      id: 'fallback-munich-rest-3',
-      name: 'Hofbrauhaus',
-      amenity: 'restaurant',
-      cuisine: 'bavarian',
-      lat: 48.1376,
-      lng: 11.5799,
-    },
-    {
-      id: 'fallback-munich-rest-4',
-      name: 'Viktualienmarkt Biergarten',
-      amenity: 'restaurant',
-      cuisine: 'german',
-      lat: 48.1351,
-      lng: 11.5761,
-    },
-    {
-      id: 'fallback-munich-rest-5',
-      name: 'Schneider Brauhaus',
-      amenity: 'restaurant',
-      cuisine: 'bavarian',
-      lat: 48.1372,
-      lng: 11.5791,
-    },
-    {
-      id: 'fallback-munich-rest-6',
-      name: 'Wirtshaus in der Au',
-      amenity: 'restaurant',
-      cuisine: 'german',
-      lat: 48.1273,
-      lng: 11.5888,
-    },
-    {
-      id: 'fallback-munich-bar-1',
-      name: 'Schumann Bar',
-      amenity: 'bar',
-      cuisine: 'cocktails',
-      lat: 48.139,
-      lng: 11.5775,
-    },
-    {
-      id: 'fallback-munich-bar-2',
-      name: 'Pusser Bar',
-      amenity: 'bar',
-      cuisine: 'cocktails',
-      lat: 48.1395,
-      lng: 11.582,
-    },
+    { id: 'fallback-munich-cafe-1', name: 'Cafe Frischhut', amenity: 'cafe', cuisine: 'coffee_shop', lat: 48.1351, lng: 11.582 },
+    { id: 'fallback-munich-cafe-2', name: 'Man vs Machine', amenity: 'cafe', cuisine: 'coffee_shop', lat: 48.1376, lng: 11.5759 },
+    { id: 'fallback-munich-cafe-3', name: 'Cafe Luitpold', amenity: 'cafe', cuisine: 'coffee_shop', lat: 48.1425, lng: 11.5778 },
+    { id: 'fallback-munich-rest-1', name: 'Augustiner-Brau', amenity: 'restaurant', cuisine: 'bavarian', lat: 48.1445, lng: 11.5582 },
+    { id: 'fallback-munich-rest-2', name: 'Ratskeller Munchen', amenity: 'restaurant', cuisine: 'german', lat: 48.1374, lng: 11.5755 },
+    { id: 'fallback-munich-rest-3', name: 'Hofbrauhaus', amenity: 'restaurant', cuisine: 'bavarian', lat: 48.1376, lng: 11.5799 },
+    { id: 'fallback-munich-rest-4', name: 'Viktualienmarkt Biergarten', amenity: 'restaurant', cuisine: 'german', lat: 48.1351, lng: 11.5761 },
+    { id: 'fallback-munich-rest-5', name: 'Schneider Brauhaus', amenity: 'restaurant', cuisine: 'bavarian', lat: 48.1372, lng: 11.5791 },
+    { id: 'fallback-munich-rest-6', name: 'Wirtshaus in der Au', amenity: 'restaurant', cuisine: 'german', lat: 48.1273, lng: 11.5888 },
+    { id: 'fallback-munich-bar-1', name: 'Schumann Bar', amenity: 'bar', cuisine: 'cocktails', lat: 48.139, lng: 11.5775 },
+    { id: 'fallback-munich-bar-2', name: 'Pusser Bar', amenity: 'bar', cuisine: 'cocktails', lat: 48.1395, lng: 11.582 },
   ],
 };
 
-export function getFallbackRestaurants(cityName, lat, lng) {
-  const normalized = cityName.toLowerCase().replace(/[^a-z]/g, '');
-  const cityData = (FALLBACK_RESTAURANTS[normalized] || FALLBACK_RESTAURANTS.munich).filter(
-    (r) => Math.abs(r.lat - lat) < 0.05 && Math.abs(r.lng - lng) < 0.08,
-  );
-
-  // Add default coordinates and tags to match expected structure
-  return cityData.map((r) => ({
-    id: r.id,
-    name: r.name,
-    lat: r.lat,
-    lng: r.lng,
-    tags: {
+export function getFallbackRestaurants(lat, lng) {
+  const allRestaurants = Object.values(FALLBACK_RESTAURANTS).flat();
+  return allRestaurants
+    .filter((r) => Math.abs(r.lat - lat) < 0.15 && Math.abs(r.lng - lng) < 0.15)
+    .map((r) => ({
+      id: r.id,
       name: r.name,
-      amenity: r.amenity,
-      cuisine: r.cuisine || r.amenity,
-    },
-    rating: null,
-    url: `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`,
-    wikipedia: null,
-  }));
+      lat: r.lat,
+      lng: r.lng,
+      tags: { name: r.name, amenity: r.amenity, cuisine: r.cuisine || r.amenity },
+      rating: null,
+      url: `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`,
+      wikipedia: null,
+    }));
 }
