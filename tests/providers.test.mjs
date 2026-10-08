@@ -49,7 +49,7 @@ test('Overpass fails over and temporarily skips an endpoint after repeated failu
     false,
   );
   assert.equal(
-    calls.slice(before).some((url) => url.includes('private.coffee')),
+    calls.slice(before).some((url) => url.includes('overpass-api.de')),
     true,
   );
 });

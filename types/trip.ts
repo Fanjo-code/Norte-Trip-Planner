@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react';
 import type { Ionicons } from '@expo/vector-icons';
 export type IoniconName = ComponentProps<typeof Ionicons>['name'];
-export type Meal = 'Breakfast' | 'Lunch' | 'Dinner' | 'Drinks';
+export type Meal = 'Breakfast' | 'Meals' | 'Drinks';
 export type Pace = 'relaxed' | 'balanced' | 'packed';
 export type BudgetTier = 'budget' | 'standard' | 'premium';
 export interface UserPreferences {

@@ -148,9 +148,7 @@ function meal(place: Osm): Restaurant['meal'] {
     ? 'Breakfast'
     : ['bar', 'pub'].includes(place.tags.amenity)
       ? 'Drinks'
-      : place.tags.lunch === 'yes'
-        ? 'Lunch'
-        : 'Dinner';
+      : 'Meals';
 }
 const now = () => localISO(new Date()) + 'T' + new Date().toTimeString().slice(0, 8);
 export const stage = (
